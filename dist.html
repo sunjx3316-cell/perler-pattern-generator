@@ -1,0 +1,3635 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script>
+    window.onerror = function(msg, url, line, col, error) {
+        // Ignore ResizeObserver loop limit exceeded
+        if (msg.includes('ResizeObserver')) return false;
+        alert("Error: " + msg + "\nLine: " + line);
+        return false;
+    };
+    </script>
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拼豆图纸生成器 (Perler Bead Pattern Generator)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.bootcdn.net/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+.disabled-section {
+    opacity: 0.5;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.disabled-section.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Custom Scrollbar for the table if needed */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1; 
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8; 
+}
+
+</style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                <h1 class="text-xl font-bold text-gray-900">拼豆图纸生成器</h1>
+            </div>
+            <nav class="hidden md:flex space-x-4">
+                <a href="#" class="text-gray-500 hover:text-gray-900">使用指南</a>
+                <a href="#" class="text-gray-500 hover:text-gray-900">关于</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Column: Controls & Input (4 cols) -->
+            <div class="lg:col-span-4 space-y-6">
+                
+                <!-- Upload Zone -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        1. 上传图片
+                    </h2>
+                    <div id="dropzone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-primary hover:bg-blue-50 transition-colors cursor-pointer">
+                        <input type="file" id="fileInput" class="hidden" accept="image/*">
+                        <div class="space-y-2">
+                            <div class="mx-auto h-12 w-12 text-gray-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            </div>
+                            <p class="text-sm text-gray-500">点击或拖拽图片到此处</p>
+                            <p class="text-xs text-gray-400">支持 JPG, PNG, GIF</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Parameters -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 disabled-section" id="controlsSection">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        2. 调整参数
+                    </h2>
+                    
+                    <!-- Width Control -->
+                    <div class="mb-5">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            宽度 (豆粒数): <span id="widthVal" class="text-primary font-bold">50</span>
+                        </label>
+                        <input type="range" id="widthRange" min="20" max="150" value="50" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                        <div class="flex justify-between text-xs text-gray-400 mt-1">
+                            <span>20</span>
+                            <span class="text-xs text-gray-500">提示: 增加宽度可提升细节还原度</span>
+                            <span>150</span>
+                        </div>
+                    </div>
+
+                    <!-- Palette Selection -->
+                    <div class="mb-5">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">颜色品牌库</label>
+                        <select id="paletteSelect" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 p-2 border">
+                            <option value="custom">通用拼豆 (A-H 色号系统)</option>
+                            <option value="perler">Perler (标准)</option>
+                            <option value="hama">Hama Midi</option>
+                            <option value="artkal">Artkal S</option>
+                        </select>
+                    </div>
+
+                    <!-- Image Adjustments -->
+                    <div class="space-y-4 border-t pt-4">
+                        <p class="text-sm font-medium text-gray-700">图像增强</p>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">亮度: <span id="brightnessVal">0</span></label>
+                            <input type="range" id="brightnessRange" min="-50" max="50" value="0" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">对比度: <span id="contrastVal">0</span></label>
+                            <input type="range" id="contrastRange" min="-50" max="50" value="0" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-gray-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">饱和度</label>
+                            <div class="flex items-center gap-2">
+                                <input type="range" id="saturationRange" min="-100" max="100" value="0" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                <span id="saturationVal" class="text-sm text-gray-500 w-8">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Options -->
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="mb-4">
+                            <p class="text-sm font-medium text-gray-700 mb-2">高级处理</p>
+                            
+                            <div class="flex flex-wrap gap-4 mb-3">
+                                <label class="flex items-center gap-2 cursor-pointer" title="自动增强原图色彩，使结果更鲜艳">
+                                    <input type="checkbox" id="autoEnhanceCheck" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary" checked>
+                                    <span class="text-sm text-gray-700">自动增强</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer" title="针对动漫/线稿优化，增强线条清晰度">
+                                    <input type="checkbox" id="preserveLinesCheck" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary" checked>
+                                    <span class="text-sm text-gray-700">保留线条</span>
+                                </label>
+                            </div>
+
+                            <!-- Background Removal Tool -->
+                            <div id="bgRemovalTool" class="bg-blue-50 p-3 rounded-lg border border-blue-100 mb-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-medium text-blue-900">背景移除工具</span>
+                                    <div class="flex gap-2">
+                                        <button id="toggleWandBtn" class="p-1.5 bg-white border border-blue-200 rounded hover:bg-blue-100 transition text-blue-600" title="启用/禁用 魔棒工具 (点击背景移除)">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                                            </svg>
+                                        </button>
+                                        <button id="undoWandBtn" class="p-1.5 bg-white border border-blue-200 rounded hover:bg-blue-100 transition text-blue-600" title="撤销上一步">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                            </svg>
+                                        </button>
+                                        <button id="resetWandBtn" class="p-1.5 bg-white border border-blue-200 rounded hover:bg-blue-100 transition text-red-500" title="重置背景">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-xs text-blue-800">容差: <span id="wandToleranceVal">30</span></span>
+                                    <input type="range" id="wandToleranceRange" min="0" max="100" value="30" class="w-20 h-1 bg-blue-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                                </div>
+                                <div class="mt-2 flex justify-end">
+                                    <button id="autoBgBtn" class="text-xs bg-white border border-blue-200 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 transition" title="自动移除四个角落的同色背景">
+                                        自动移除背景
+                                    </button>
+                                </div>
+                            </div>
+
+
+                        </div>
+
+                        <div class="flex flex-wrap gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" id="ditheringCheck" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                                <span class="text-sm text-gray-700">启用抖动 (Dithering)</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <span class="text-sm text-gray-700">匹配算法:</span>
+                                <select id="matchModeSelect" class="text-sm border-gray-300 rounded-md focus:border-primary focus:ring-primary py-1 px-2">
+                                    <option value="lab" selected>CIELAB (更精准)</option>
+                                    <option value="rgb">RGB (更快)</option>
+                                </select>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <span class="text-sm text-gray-700">采样模式:</span>
+                                <select id="resizeModeSelect" class="text-sm border-gray-300 rounded-md focus:border-primary focus:ring-primary py-1 px-2">
+                                    <option value="dominant" selected>主色采样 (清晰)</option>
+                                    <option value="average">平均采样 (柔和)</option>
+                                </select>
+                            </label>
+                        </div>
+                        
+                        <!-- Grid Alignment -->
+                        <div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
+                             <span class="text-sm text-gray-700 font-medium">网格对齐 (Offset):</span>
+                             <label class="text-xs text-gray-500">X:</label>
+                             <input type="number" id="gridOffsetXInput" value="0" class="w-14 h-7 text-sm border-gray-300 rounded focus:border-primary focus:ring-primary" title="Horizontal Offset (Pixels)">
+                             <label class="text-xs text-gray-500 ml-2">Y:</label>
+                             <input type="number" id="gridOffsetYInput" value="0" class="w-14 h-7 text-sm border-gray-300 rounded focus:border-primary focus:ring-primary" title="Vertical Offset (Pixels)">
+                             <span class="text-xs text-gray-400 ml-2">(微调采样位置)</span>
+                        </div>
+                    </div>
+
+                    <button id="processBtn" class="w-full mt-6 bg-primary text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-200 font-medium shadow-sm">
+                        重新生成预览
+                    </button>
+                </div>
+
+                <!-- Action -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 disabled-section" id="downloadSection">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        3. 导出图纸
+                    </h2>
+                    <div class="space-y-3">
+                        <button id="downloadPdfBtn" class="w-full flex items-center justify-center space-x-2 border border-transparent bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            <span>下载 PDF 图纸</span>
+                        </button>
+                         <button id="downloadImgBtn" class="w-full flex items-center justify-center space-x-2 border border-gray-300 bg-white text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                            <span>下载预览图片</span>
+                        </button>
+                        <button id="sliceBtn" class="w-full flex items-center justify-center space-x-2 border border-indigo-300 bg-indigo-50 text-indigo-700 py-2 px-4 rounded-md hover:bg-indigo-100 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                            <span>生成切片 (Slices)</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Preview (8 cols) -->
+            <div class="lg:col-span-8 space-y-6">
+                
+                <!-- Slice Output Section (Initially Hidden) -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hidden" id="sliceSection">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold">切片预览 (Slices)</h2>
+                        <div class="flex items-center space-x-2">
+                             <label class="text-sm text-gray-600">切片大小 (Beads):</label>
+                             <input type="number" id="sliceSizeInput" value="29" class="w-16 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                             <button id="regenerateSlicesBtn" class="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded transition">刷新</button>
+                             <button id="closeSliceBtn" class="text-gray-400 hover:text-gray-600 px-2 text-lg">×</button>
+                        </div>
+                    </div>
+                    <div id="sliceContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-auto max-h-[600px]">
+                        <!-- Slices will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Preview Canvas -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold">实时预览</h2>
+                        <div class="flex items-center space-x-3">
+                             <label class="inline-flex items-center">
+                                <input type="checkbox" id="showGridCheck" checked class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
+                                <span class="ml-1 text-sm text-gray-600">网格</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="showCoordsCheck" checked class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
+                                <span class="ml-1 text-sm text-gray-600">坐标</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="showCodesCheck" checked class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
+                                <span class="ml-1 text-sm text-gray-600">色号</span>
+                            </label>
+                            <span class="text-sm text-gray-400">|</span>
+                            <label class="inline-flex items-center" title="显示大网格 (便于拼装)">
+                                <input type="checkbox" id="showRefGridCheck" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
+                                <span class="ml-1 text-sm text-gray-600">大网格</span>
+                            </label>
+                             <input type="number" id="refGridSize" value="29" min="5" max="100" class="w-12 h-6 text-xs border-gray-300 rounded ml-1" title="大网格尺寸">
+                            <span class="text-sm text-gray-400">|</span>
+                             <div class="text-sm text-gray-500">
+                                 尺寸: <span id="previewDims">- x -</span>
+                             </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-grow flex items-center justify-center bg-gray-100 rounded-lg overflow-auto p-4 relative" id="canvasContainer">
+                        <p id="emptyState" class="text-gray-400 text-center">
+                            请先在左侧上传图片<br>
+                            生成的像素图将在此显示
+                        </p>
+                        <!-- Main display canvas -->
+                        <canvas id="pixelCanvas" class="hidden shadow-lg max-w-full"></canvas>
+                    </div>
+                </div>
+
+                <!-- Color List / Bill of Materials -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hidden" id="bomSection">
+                    <h2 class="text-lg font-semibold mb-4">颜色用量表</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">颜色预览</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">色号 / 名称</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">数量 (颗)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="bomBody">
+                                <!-- Filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Hidden Processing Canvas -->
+    <canvas id="processCanvas" class="hidden"></canvas>
+
+    <script>
+const PALETTES = {
+    mard: [
+    {
+        "id": "A01",
+        "name": "A01",
+        "hex": "#FAF4C8",
+        "r": 250,
+        "g": 244,
+        "b": 200
+    },
+    {
+        "id": "A02",
+        "name": "A02",
+        "hex": "#FFFFD5",
+        "r": 255,
+        "g": 255,
+        "b": 213
+    },
+    {
+        "id": "A03",
+        "name": "A03",
+        "hex": "#FEFF88",
+        "r": 254,
+        "g": 255,
+        "b": 136
+    },
+    {
+        "id": "A04",
+        "name": "A04",
+        "hex": "#FFBD56",
+        "r": 255,
+        "g": 189,
+        "b": 86
+    },
+    {
+        "id": "A05",
+        "name": "A05",
+        "hex": "#FD7380",
+        "r": 253,
+        "g": 115,
+        "b": 128
+    },
+    {
+        "id": "A06",
+        "name": "A06",
+        "hex": "#FEAC4C",
+        "r": 254,
+        "g": 172,
+        "b": 76
+    },
+    {
+        "id": "A07",
+        "name": "A07",
+        "hex": "#FEB84C",
+        "r": 254,
+        "g": 184,
+        "b": 76
+    },
+    {
+        "id": "A08",
+        "name": "A08",
+        "hex": "#FFDA45",
+        "r": 255,
+        "g": 218,
+        "b": 69
+    },
+    {
+        "id": "A09",
+        "name": "A09",
+        "hex": "#FF95B0",
+        "r": 255,
+        "g": 149,
+        "b": 176
+    },
+    {
+        "id": "A10",
+        "name": "A10",
+        "hex": "#F77C31",
+        "r": 247,
+        "g": 124,
+        "b": 49
+    },
+    {
+        "id": "A11",
+        "name": "A11",
+        "hex": "#FFD990",
+        "r": 255,
+        "g": 217,
+        "b": 144
+    },
+    {
+        "id": "A12",
+        "name": "A12",
+        "hex": "#FE9772",
+        "r": 254,
+        "g": 151,
+        "b": 114
+    },
+    {
+        "id": "A13",
+        "name": "A13",
+        "hex": "#FFC365",
+        "r": 255,
+        "g": 195,
+        "b": 101
+    },
+    {
+        "id": "A14",
+        "name": "A14",
+        "hex": "#FD543D",
+        "r": 253,
+        "g": 84,
+        "b": 61
+    },
+    {
+        "id": "A15",
+        "name": "A15",
+        "hex": "#FFF365",
+        "r": 255,
+        "g": 243,
+        "b": 101
+    },
+    {
+        "id": "A16",
+        "name": "A16",
+        "hex": "#FFFF9F",
+        "r": 255,
+        "g": 255,
+        "b": 159
+    },
+    {
+        "id": "A17",
+        "name": "A17",
+        "hex": "#FFE36E",
+        "r": 255,
+        "g": 227,
+        "b": 110
+    },
+    {
+        "id": "A18",
+        "name": "A18",
+        "hex": "#FEBE7D",
+        "r": 254,
+        "g": 190,
+        "b": 125
+    },
+    {
+        "id": "A19",
+        "name": "A19",
+        "hex": "#FD7C72",
+        "r": 253,
+        "g": 124,
+        "b": 114
+    },
+    {
+        "id": "A20",
+        "name": "A20",
+        "hex": "#FFD568",
+        "r": 255,
+        "g": 213,
+        "b": 104
+    },
+    {
+        "id": "A21",
+        "name": "A21",
+        "hex": "#FFE395",
+        "r": 255,
+        "g": 227,
+        "b": 149
+    },
+    {
+        "id": "A22",
+        "name": "A22",
+        "hex": "#FAF57D",
+        "r": 250,
+        "g": 245,
+        "b": 125
+    },
+    {
+        "id": "A23",
+        "name": "A23",
+        "hex": "#E6C987",
+        "r": 230,
+        "g": 201,
+        "b": 135
+    },
+    {
+        "id": "A24",
+        "name": "A24",
+        "hex": "#F7F8A2",
+        "r": 247,
+        "g": 248,
+        "b": 162
+    },
+    {
+        "id": "A25",
+        "name": "A25",
+        "hex": "#FFD67D",
+        "r": 255,
+        "g": 214,
+        "b": 125
+    },
+    {
+        "id": "A26",
+        "name": "A26",
+        "hex": "#FFC830",
+        "r": 255,
+        "g": 200,
+        "b": 48
+    },
+    {
+        "id": "B01",
+        "name": "B01",
+        "hex": "#E8EE31",
+        "r": 232,
+        "g": 238,
+        "b": 49
+    },
+    {
+        "id": "B02",
+        "name": "B02",
+        "hex": "#63F347",
+        "r": 99,
+        "g": 243,
+        "b": 71
+    },
+    {
+        "id": "B03",
+        "name": "B03",
+        "hex": "#9EF780",
+        "r": 158,
+        "g": 247,
+        "b": 128
+    },
+    {
+        "id": "B04",
+        "name": "B04",
+        "hex": "#05DE85",
+        "r": 5,
+        "g": 222,
+        "b": 133
+    },
+    {
+        "id": "B05",
+        "name": "B05",
+        "hex": "#03E352",
+        "r": 3,
+        "g": 227,
+        "b": 82
+    },
+    {
+        "id": "B06",
+        "name": "B06",
+        "hex": "#65E2A6",
+        "r": 101,
+        "g": 226,
+        "b": 166
+    },
+    {
+        "id": "B07",
+        "name": "B07",
+        "hex": "#3DAF80",
+        "r": 61,
+        "g": 175,
+        "b": 128
+    },
+    {
+        "id": "B08",
+        "name": "B08",
+        "hex": "#1C3CAF",
+        "r": 28,
+        "g": 60,
+        "b": 175
+    },
+    {
+        "id": "B09",
+        "name": "B09",
+        "hex": "#27523A",
+        "r": 39,
+        "g": 82,
+        "b": 58
+    },
+    {
+        "id": "B10",
+        "name": "B10",
+        "hex": "#95D3C2",
+        "r": 149,
+        "g": 211,
+        "b": 194
+    },
+    {
+        "id": "B11",
+        "name": "B11",
+        "hex": "#5D722A",
+        "r": 93,
+        "g": 114,
+        "b": 42
+    },
+    {
+        "id": "B12",
+        "name": "B12",
+        "hex": "#166741",
+        "r": 22,
+        "g": 103,
+        "b": 65
+    },
+    {
+        "id": "B13",
+        "name": "B13",
+        "hex": "#CAE879",
+        "r": 202,
+        "g": 232,
+        "b": 121
+    },
+    {
+        "id": "B14",
+        "name": "B14",
+        "hex": "#ADE946",
+        "r": 173,
+        "g": 233,
+        "b": 70
+    },
+    {
+        "id": "B15",
+        "name": "B15",
+        "hex": "#2E5132",
+        "r": 46,
+        "g": 81,
+        "b": 50
+    },
+    {
+        "id": "B16",
+        "name": "B16",
+        "hex": "#C5CD9C",
+        "r": 197,
+        "g": 205,
+        "b": 156
+    },
+    {
+        "id": "B17",
+        "name": "B17",
+        "hex": "#98B13A",
+        "r": 152,
+        "g": 177,
+        "b": 58
+    },
+    {
+        "id": "B18",
+        "name": "B18",
+        "hex": "#E6E549",
+        "r": 230,
+        "g": 229,
+        "b": 73
+    },
+    {
+        "id": "B19",
+        "name": "B19",
+        "hex": "#24888C",
+        "r": 36,
+        "g": 136,
+        "b": 140
+    },
+    {
+        "id": "B20",
+        "name": "B20",
+        "hex": "#C2F9CC",
+        "r": 194,
+        "g": 249,
+        "b": 204
+    },
+    {
+        "id": "B21",
+        "name": "B21",
+        "hex": "#156A68",
+        "r": 21,
+        "g": 106,
+        "b": 104
+    },
+    {
+        "id": "B22",
+        "name": "B22",
+        "hex": "#983C43",
+        "r": 152,
+        "g": 60,
+        "b": 67
+    },
+    {
+        "id": "B23",
+        "name": "B23",
+        "hex": "#3B3A21",
+        "r": 59,
+        "g": 58,
+        "b": 33
+    },
+    {
+        "id": "B24",
+        "name": "B24",
+        "hex": "#EEFCA5",
+        "r": 238,
+        "g": 252,
+        "b": 165
+    },
+    {
+        "id": "B25",
+        "name": "B25",
+        "hex": "#4E846D",
+        "r": 78,
+        "g": 132,
+        "b": 109
+    },
+    {
+        "id": "B26",
+        "name": "B26",
+        "hex": "#B87A35",
+        "r": 184,
+        "g": 122,
+        "b": 53
+    },
+    {
+        "id": "B27",
+        "name": "B27",
+        "hex": "#CCE1AF",
+        "r": 204,
+        "g": 225,
+        "b": 175
+    },
+    {
+        "id": "B28",
+        "name": "B28",
+        "hex": "#9EE589",
+        "r": 158,
+        "g": 229,
+        "b": 137
+    },
+    {
+        "id": "B29",
+        "name": "B29",
+        "hex": "#C5E254",
+        "r": 197,
+        "g": 226,
+        "b": 84
+    },
+    {
+        "id": "B30",
+        "name": "B30",
+        "hex": "#E2FCB1",
+        "r": 226,
+        "g": 252,
+        "b": 177
+    },
+    {
+        "id": "B31",
+        "name": "B31",
+        "hex": "#BBE792",
+        "r": 187,
+        "g": 231,
+        "b": 146
+    },
+    {
+        "id": "B32",
+        "name": "B32",
+        "hex": "#9CAB5A",
+        "r": 156,
+        "g": 171,
+        "b": 90
+    },
+    {
+        "id": "C01",
+        "name": "C01",
+        "hex": "#E8FFE7",
+        "r": 232,
+        "g": 255,
+        "b": 231
+    },
+    {
+        "id": "C02",
+        "name": "C02",
+        "hex": "#0A19FC",
+        "r": 10,
+        "g": 25,
+        "b": 252
+    },
+    {
+        "id": "C03",
+        "name": "C03",
+        "hex": "#BAE2F8",
+        "r": 186,
+        "g": 226,
+        "b": 248
+    },
+    {
+        "id": "C04",
+        "name": "C04",
+        "hex": "#41CCFF",
+        "r": 65,
+        "g": 204,
+        "b": 255
+    },
+    {
+        "id": "C05",
+        "name": "C05",
+        "hex": "#091ACB",
+        "r": 9,
+        "g": 26,
+        "b": 203
+    },
+    {
+        "id": "C06",
+        "name": "C06",
+        "hex": "#F5AFF0",
+        "r": 245,
+        "g": 175,
+        "b": 240
+    },
+    {
+        "id": "C07",
+        "name": "C07",
+        "hex": "#3677D2",
+        "r": 54,
+        "g": 119,
+        "b": 210
+    },
+    {
+        "id": "C08",
+        "name": "C08",
+        "hex": "#FF54C0",
+        "r": 255,
+        "g": 84,
+        "b": 192
+    },
+    {
+        "id": "C09",
+        "name": "C09",
+        "hex": "#3248CA",
+        "r": 50,
+        "g": 72,
+        "b": 202
+    },
+    {
+        "id": "C10",
+        "name": "C10",
+        "hex": "#3EBCE2",
+        "r": 62,
+        "g": 188,
+        "b": 226
+    },
+    {
+        "id": "C11",
+        "name": "C11",
+        "hex": "#28D0DE",
+        "r": 40,
+        "g": 208,
+        "b": 222
+    },
+    {
+        "id": "C12",
+        "name": "C12",
+        "hex": "#1C334D",
+        "r": 28,
+        "g": 51,
+        "b": 77
+    },
+    {
+        "id": "C13",
+        "name": "C13",
+        "hex": "#CDE8FF",
+        "r": 205,
+        "g": 232,
+        "b": 255
+    },
+    {
+        "id": "C14",
+        "name": "C14",
+        "hex": "#D5F0FF",
+        "r": 213,
+        "g": 240,
+        "b": 255
+    },
+    {
+        "id": "C15",
+        "name": "C15",
+        "hex": "#22C4C6",
+        "r": 34,
+        "g": 196,
+        "b": 198
+    },
+    {
+        "id": "C16",
+        "name": "C16",
+        "hex": "#1557A8",
+        "r": 21,
+        "g": 87,
+        "b": 168
+    },
+    {
+        "id": "C17",
+        "name": "C17",
+        "hex": "#04D7F6",
+        "r": 4,
+        "g": 215,
+        "b": 246
+    },
+    {
+        "id": "C18",
+        "name": "C18",
+        "hex": "#011344",
+        "r": 1,
+        "g": 19,
+        "b": 68
+    },
+    {
+        "id": "C19",
+        "name": "C19",
+        "hex": "#188762",
+        "r": 24,
+        "g": 135,
+        "b": 98
+    },
+    {
+        "id": "C20",
+        "name": "C20",
+        "hex": "#0769AF",
+        "r": 7,
+        "g": 105,
+        "b": 175
+    },
+    {
+        "id": "C21",
+        "name": "C21",
+        "hex": "#03D7DF",
+        "r": 3,
+        "g": 215,
+        "b": 223
+    },
+    {
+        "id": "C22",
+        "name": "C22",
+        "hex": "#67B8EE",
+        "r": 103,
+        "g": 184,
+        "b": 238
+    },
+    {
+        "id": "C23",
+        "name": "C23",
+        "hex": "#C8E2FF",
+        "r": 200,
+        "g": 226,
+        "b": 255
+    },
+    {
+        "id": "C24",
+        "name": "C24",
+        "hex": "#7CC4FF",
+        "r": 124,
+        "g": 196,
+        "b": 255
+    },
+    {
+        "id": "C25",
+        "name": "C25",
+        "hex": "#A0E5E5",
+        "r": 160,
+        "g": 229,
+        "b": 229
+    },
+    {
+        "id": "C26",
+        "name": "C26",
+        "hex": "#3CAE08",
+        "r": 60,
+        "g": 174,
+        "b": 8
+    },
+    {
+        "id": "C27",
+        "name": "C27",
+        "hex": "#3D3FFA",
+        "r": 61,
+        "g": 63,
+        "b": 250
+    },
+    {
+        "id": "C28",
+        "name": "C28",
+        "hex": "#BBCFED",
+        "r": 187,
+        "g": 207,
+        "b": 237
+    },
+    {
+        "id": "C29",
+        "name": "C29",
+        "hex": "#34488E",
+        "r": 52,
+        "g": 72,
+        "b": 142
+    },
+    {
+        "id": "D01",
+        "name": "D01",
+        "hex": "#AEB4F2",
+        "r": 174,
+        "g": 180,
+        "b": 242
+    },
+    {
+        "id": "D02",
+        "name": "D02",
+        "hex": "#838ED0",
+        "r": 131,
+        "g": 142,
+        "b": 208
+    },
+    {
+        "id": "D03",
+        "name": "D03",
+        "hex": "#2F54AF",
+        "r": 47,
+        "g": 84,
+        "b": 175
+    },
+    {
+        "id": "D04",
+        "name": "D04",
+        "hex": "#182A64",
+        "r": 24,
+        "g": 42,
+        "b": 100
+    },
+    {
+        "id": "D05",
+        "name": "D05",
+        "hex": "#B84365",
+        "r": 184,
+        "g": 67,
+        "b": 101
+    },
+    {
+        "id": "D06",
+        "name": "D06",
+        "hex": "#A778DE",
+        "r": 167,
+        "g": 120,
+        "b": 222
+    },
+    {
+        "id": "D07",
+        "name": "D07",
+        "hex": "#B85483",
+        "r": 184,
+        "g": 84,
+        "b": 131
+    },
+    {
+        "id": "D08",
+        "name": "D08",
+        "hex": "#FE3DFF",
+        "r": 254,
+        "g": 61,
+        "b": 255
+    },
+    {
+        "id": "D09",
+        "name": "D09",
+        "hex": "#D5B9F8",
+        "r": 213,
+        "g": 185,
+        "b": 248
+    },
+    {
+        "id": "D10",
+        "name": "D10",
+        "hex": "#363851",
+        "r": 54,
+        "g": 56,
+        "b": 81
+    },
+    {
+        "id": "D11",
+        "name": "D11",
+        "hex": "#F9BAE1",
+        "r": 249,
+        "g": 186,
+        "b": 225
+    },
+    {
+        "id": "D12",
+        "name": "D12",
+        "hex": "#E90AD4",
+        "r": 233,
+        "g": 10,
+        "b": 212
+    },
+    {
+        "id": "D13",
+        "name": "D13",
+        "hex": "#B90095",
+        "r": 185,
+        "g": 0,
+        "b": 149
+    },
+    {
+        "id": "D14",
+        "name": "D14",
+        "hex": "#882798",
+        "r": 136,
+        "g": 39,
+        "b": 152
+    },
+    {
+        "id": "D15",
+        "name": "D15",
+        "hex": "#2F3F98",
+        "r": 47,
+        "g": 63,
+        "b": 152
+    },
+    {
+        "id": "D16",
+        "name": "D16",
+        "hex": "#E301EE",
+        "r": 227,
+        "g": 1,
+        "b": 238
+    },
+    {
+        "id": "D17",
+        "name": "D17",
+        "hex": "#FCBAF6",
+        "r": 252,
+        "g": 186,
+        "b": 246
+    },
+    {
+        "id": "D18",
+        "name": "D18",
+        "hex": "#A45EC7",
+        "r": 164,
+        "g": 94,
+        "b": 199
+    },
+    {
+        "id": "D19",
+        "name": "D19",
+        "hex": "#DB0C87",
+        "r": 219,
+        "g": 12,
+        "b": 135
+    },
+    {
+        "id": "D20",
+        "name": "D20",
+        "hex": "#9C3282",
+        "r": 156,
+        "g": 50,
+        "b": 130
+    },
+    {
+        "id": "D21",
+        "name": "D21",
+        "hex": "#9AA098",
+        "r": 154,
+        "g": 160,
+        "b": 152
+    },
+    {
+        "id": "D22",
+        "name": "D22",
+        "hex": "#313A05",
+        "r": 49,
+        "g": 58,
+        "b": 5
+    },
+    {
+        "id": "D23",
+        "name": "D23",
+        "hex": "#E8DAFC",
+        "r": 232,
+        "g": 218,
+        "b": 252
+    },
+    {
+        "id": "D24",
+        "name": "D24",
+        "hex": "#7786E5",
+        "r": 119,
+        "g": 134,
+        "b": 229
+    },
+    {
+        "id": "D25",
+        "name": "D25",
+        "hex": "#400AF7",
+        "r": 64,
+        "g": 10,
+        "b": 247
+    },
+    {
+        "id": "D26",
+        "name": "D26",
+        "hex": "#DFC2F8",
+        "r": 223,
+        "g": 194,
+        "b": 248
+    },
+    {
+        "id": "E01",
+        "name": "E01",
+        "hex": "#FFD3CC",
+        "r": 255,
+        "g": 211,
+        "b": 204
+    },
+    {
+        "id": "E02",
+        "name": "E02",
+        "hex": "#FECBDF",
+        "r": 254,
+        "g": 203,
+        "b": 223
+    },
+    {
+        "id": "E03",
+        "name": "E03",
+        "hex": "#F87E70",
+        "r": 248,
+        "g": 126,
+        "b": 112
+    },
+    {
+        "id": "E04",
+        "name": "E04",
+        "hex": "#E8649E",
+        "r": 232,
+        "g": 100,
+        "b": 158
+    },
+    {
+        "id": "E05",
+        "name": "E05",
+        "hex": "#F551A2",
+        "r": 245,
+        "g": 81,
+        "b": 162
+    },
+    {
+        "id": "E06",
+        "name": "E06",
+        "hex": "#F13D74",
+        "r": 241,
+        "g": 61,
+        "b": 116
+    },
+    {
+        "id": "E07",
+        "name": "E07",
+        "hex": "#C53A78",
+        "r": 197,
+        "g": 58,
+        "b": 120
+    },
+    {
+        "id": "E08",
+        "name": "E08",
+        "hex": "#FF8BE9",
+        "r": 255,
+        "g": 139,
+        "b": 233
+    },
+    {
+        "id": "E09",
+        "name": "E09",
+        "hex": "#E97ECC",
+        "r": 233,
+        "g": 126,
+        "b": 204
+    },
+    {
+        "id": "E10",
+        "name": "E10",
+        "hex": "#D33793",
+        "r": 211,
+        "g": 55,
+        "b": 147
+    },
+    {
+        "id": "E11",
+        "name": "E11",
+        "hex": "#FCDD20",
+        "r": 252,
+        "g": 221,
+        "b": 32
+    },
+    {
+        "id": "E12",
+        "name": "E12",
+        "hex": "#F78FC3",
+        "r": 247,
+        "g": 143,
+        "b": 195
+    },
+    {
+        "id": "E13",
+        "name": "E13",
+        "hex": "#B5986D",
+        "r": 181,
+        "g": 152,
+        "b": 109
+    },
+    {
+        "id": "E14",
+        "name": "E14",
+        "hex": "#FFD1BA",
+        "r": 255,
+        "g": 209,
+        "b": 186
+    },
+    {
+        "id": "E15",
+        "name": "E15",
+        "hex": "#FF87C9",
+        "r": 255,
+        "g": 135,
+        "b": 201
+    },
+    {
+        "id": "E16",
+        "name": "E16",
+        "hex": "#FFF3EB",
+        "r": 255,
+        "g": 243,
+        "b": 235
+    },
+    {
+        "id": "E17",
+        "name": "E17",
+        "hex": "#FFEEA0",
+        "r": 255,
+        "g": 238,
+        "b": 160
+    },
+    {
+        "id": "E18",
+        "name": "E18",
+        "hex": "#FFC708",
+        "r": 255,
+        "g": 199,
+        "b": 8
+    },
+    {
+        "id": "E19",
+        "name": "E19",
+        "hex": "#FEBA50",
+        "r": 254,
+        "g": 186,
+        "b": 80
+    },
+    {
+        "id": "E20",
+        "name": "E20",
+        "hex": "#D8C7D3",
+        "r": 216,
+        "g": 199,
+        "b": 211
+    },
+    {
+        "id": "E21",
+        "name": "E21",
+        "hex": "#BBD0A1",
+        "r": 187,
+        "g": 208,
+        "b": 161
+    },
+    {
+        "id": "E22",
+        "name": "E22",
+        "hex": "#8785A1",
+        "r": 135,
+        "g": 133,
+        "b": 161
+    },
+    {
+        "id": "E23",
+        "name": "E23",
+        "hex": "#937ABD",
+        "r": 147,
+        "g": 122,
+        "b": 189
+    },
+    {
+        "id": "E24",
+        "name": "E24",
+        "hex": "#E3BC18",
+        "r": 227,
+        "g": 188,
+        "b": 24
+    },
+    {
+        "id": "F01",
+        "name": "F01",
+        "hex": "#FD9578",
+        "r": 253,
+        "g": 149,
+        "b": 120
+    },
+    {
+        "id": "F02",
+        "name": "F02",
+        "hex": "#FC3046",
+        "r": 252,
+        "g": 48,
+        "b": 70
+    },
+    {
+        "id": "F03",
+        "name": "F03",
+        "hex": "#F74941",
+        "r": 247,
+        "g": 73,
+        "b": 65
+    },
+    {
+        "id": "F04",
+        "name": "F04",
+        "hex": "#FC283C",
+        "r": 252,
+        "g": 40,
+        "b": 60
+    },
+    {
+        "id": "F05",
+        "name": "F05",
+        "hex": "#F7692F",
+        "r": 247,
+        "g": 105,
+        "b": 47
+    },
+    {
+        "id": "F06",
+        "name": "F06",
+        "hex": "#F94363",
+        "r": 249,
+        "g": 67,
+        "b": 99
+    },
+    {
+        "id": "F07",
+        "name": "F07",
+        "hex": "#971937",
+        "r": 151,
+        "g": 25,
+        "b": 55
+    },
+    {
+        "id": "F08",
+        "name": "F08",
+        "hex": "#C80828",
+        "r": 200,
+        "g": 8,
+        "b": 40
+    },
+    {
+        "id": "F09",
+        "name": "F09",
+        "hex": "#E2677A",
+        "r": 226,
+        "g": 103,
+        "b": 122
+    },
+    {
+        "id": "F10",
+        "name": "F10",
+        "hex": "#8AA526",
+        "r": 138,
+        "g": 165,
+        "b": 38
+    },
+    {
+        "id": "F11",
+        "name": "F11",
+        "hex": "#5A2121",
+        "r": 90,
+        "g": 33,
+        "b": 33
+    },
+    {
+        "id": "F12",
+        "name": "F12",
+        "hex": "#FDE6A0",
+        "r": 253,
+        "g": 230,
+        "b": 160
+    },
+    {
+        "id": "F13",
+        "name": "F13",
+        "hex": "#F57440",
+        "r": 245,
+        "g": 116,
+        "b": 64
+    },
+    {
+        "id": "F14",
+        "name": "F14",
+        "hex": "#FFA8AD",
+        "r": 255,
+        "g": 168,
+        "b": 173
+    },
+    {
+        "id": "F15",
+        "name": "F15",
+        "hex": "#FD3822",
+        "r": 253,
+        "g": 56,
+        "b": 34
+    },
+    {
+        "id": "F16",
+        "name": "F16",
+        "hex": "#FEC2A6",
+        "r": 254,
+        "g": 194,
+        "b": 166
+    },
+    {
+        "id": "F17",
+        "name": "F17",
+        "hex": "#E69C79",
+        "r": 230,
+        "g": 156,
+        "b": 121
+    },
+    {
+        "id": "F18",
+        "name": "F18",
+        "hex": "#D37C46",
+        "r": 211,
+        "g": 124,
+        "b": 70
+    },
+    {
+        "id": "F19",
+        "name": "F19",
+        "hex": "#C144AA",
+        "r": 193,
+        "g": 68,
+        "b": 170
+    },
+    {
+        "id": "F20",
+        "name": "F20",
+        "hex": "#CD9391",
+        "r": 205,
+        "g": 147,
+        "b": 145
+    },
+    {
+        "id": "F21",
+        "name": "F21",
+        "hex": "#F784C5",
+        "r": 247,
+        "g": 132,
+        "b": 197
+    },
+    {
+        "id": "F22",
+        "name": "F22",
+        "hex": "#FDCB08",
+        "r": 253,
+        "g": 203,
+        "b": 8
+    },
+    {
+        "id": "F23",
+        "name": "F23",
+        "hex": "#F67E66",
+        "r": 246,
+        "g": 126,
+        "b": 102
+    },
+    {
+        "id": "F24",
+        "name": "F24",
+        "hex": "#E698AA",
+        "r": 230,
+        "g": 152,
+        "b": 170
+    },
+    {
+        "id": "F25",
+        "name": "F25",
+        "hex": "#E5484F",
+        "r": 229,
+        "g": 72,
+        "b": 79
+    },
+    {
+        "id": "G01",
+        "name": "G01",
+        "hex": "#FFE2CE",
+        "r": 255,
+        "g": 226,
+        "b": 206
+    },
+    {
+        "id": "G02",
+        "name": "G02",
+        "hex": "#FFC4AA",
+        "r": 255,
+        "g": 196,
+        "b": 170
+    },
+    {
+        "id": "G03",
+        "name": "G03",
+        "hex": "#F4C3A5",
+        "r": 244,
+        "g": 195,
+        "b": 165
+    },
+    {
+        "id": "G04",
+        "name": "G04",
+        "hex": "#F13183",
+        "r": 241,
+        "g": 49,
+        "b": 131
+    },
+    {
+        "id": "G05",
+        "name": "G05",
+        "hex": "#E8D845",
+        "r": 232,
+        "g": 216,
+        "b": 69
+    },
+    {
+        "id": "G06",
+        "name": "G06",
+        "hex": "#F90C17",
+        "r": 249,
+        "g": 12,
+        "b": 23
+    },
+    {
+        "id": "G07",
+        "name": "G07",
+        "hex": "#F0583E",
+        "r": 240,
+        "g": 88,
+        "b": 62
+    },
+    {
+        "id": "G08",
+        "name": "G08",
+        "hex": "#753832",
+        "r": 117,
+        "g": 56,
+        "b": 50
+    },
+    {
+        "id": "G09",
+        "name": "G09",
+        "hex": "#E88483",
+        "r": 232,
+        "g": 132,
+        "b": 131
+    },
+    {
+        "id": "G10",
+        "name": "G10",
+        "hex": "#F90C39",
+        "r": 249,
+        "g": 12,
+        "b": 57
+    },
+    {
+        "id": "G11",
+        "name": "G11",
+        "hex": "#F9C593",
+        "r": 249,
+        "g": 197,
+        "b": 147
+    },
+    {
+        "id": "G12",
+        "name": "G12",
+        "hex": "#FFC280",
+        "r": 255,
+        "g": 194,
+        "b": 128
+    },
+    {
+        "id": "G13",
+        "name": "G13",
+        "hex": "#F871AA",
+        "r": 248,
+        "g": 113,
+        "b": 170
+    },
+    {
+        "id": "G14",
+        "name": "G14",
+        "hex": "#BD614C",
+        "r": 189,
+        "g": 97,
+        "b": 76
+    },
+    {
+        "id": "G15",
+        "name": "G15",
+        "hex": "#FCF9E8",
+        "r": 252,
+        "g": 249,
+        "b": 232
+    },
+    {
+        "id": "G16",
+        "name": "G16",
+        "hex": "#F2D98A",
+        "r": 242,
+        "g": 217,
+        "b": 138
+    },
+    {
+        "id": "G17",
+        "name": "G17",
+        "hex": "#F85248",
+        "r": 248,
+        "g": 82,
+        "b": 72
+    },
+    {
+        "id": "G18",
+        "name": "G18",
+        "hex": "#FFE4CC",
+        "r": 255,
+        "g": 228,
+        "b": 204
+    },
+    {
+        "id": "G19",
+        "name": "G19",
+        "hex": "#E87935",
+        "r": 232,
+        "g": 121,
+        "b": 53
+    },
+    {
+        "id": "G20",
+        "name": "G20",
+        "hex": "#DA0423",
+        "r": 218,
+        "g": 4,
+        "b": 35
+    },
+    {
+        "id": "G21",
+        "name": "G21",
+        "hex": "#B88558",
+        "r": 184,
+        "g": 133,
+        "b": 88
+    },
+    {
+        "id": "H01",
+        "name": "H01",
+        "hex": "#FDFBFF",
+        "r": 253,
+        "g": 251,
+        "b": 255
+    },
+    {
+        "id": "H02",
+        "name": "H02",
+        "hex": "#FFFFFF",
+        "r": 255,
+        "g": 255,
+        "b": 255
+    },
+    {
+        "id": "H03",
+        "name": "H03",
+        "hex": "#B631BA",
+        "r": 182,
+        "g": 49,
+        "b": 186
+    },
+    {
+        "id": "H04",
+        "name": "H04",
+        "hex": "#8985C0",
+        "r": 137,
+        "g": 133,
+        "b": 192
+    },
+    {
+        "id": "H05",
+        "name": "H05",
+        "hex": "#48464E",
+        "r": 72,
+        "g": 70,
+        "b": 78
+    },
+    {
+        "id": "H06",
+        "name": "H06",
+        "hex": "#2F22F0",
+        "r": 47,
+        "g": 34,
+        "b": 240
+    },
+    {
+        "id": "H07",
+        "name": "H07",
+        "hex": "#000000",
+        "r": 0,
+        "g": 0,
+        "b": 0
+    },
+    {
+        "id": "H08",
+        "name": "H08",
+        "hex": "#E7D8D8",
+        "r": 231,
+        "g": 216,
+        "b": 216
+    },
+    {
+        "id": "H09",
+        "name": "H09",
+        "hex": "#EDEDED",
+        "r": 237,
+        "g": 237,
+        "b": 237
+    },
+    {
+        "id": "H10",
+        "name": "H10",
+        "hex": "#EEE9EA",
+        "r": 238,
+        "g": 233,
+        "b": 234
+    },
+    {
+        "id": "H11",
+        "name": "H11",
+        "hex": "#CECD05",
+        "r": 206,
+        "g": 205,
+        "b": 5
+    },
+    {
+        "id": "H12",
+        "name": "H12",
+        "hex": "#FFFFED",
+        "r": 255,
+        "g": 255,
+        "b": 237
+    },
+    {
+        "id": "H13",
+        "name": "H13",
+        "hex": "#F5EC92",
+        "r": 245,
+        "g": 236,
+        "b": 146
+    },
+    {
+        "id": "H14",
+        "name": "H14",
+        "hex": "#CFD7D3",
+        "r": 207,
+        "g": 215,
+        "b": 211
+    },
+    {
+        "id": "H15",
+        "name": "H15",
+        "hex": "#F98A68",
+        "r": 249,
+        "g": 138,
+        "b": 104
+    },
+    {
+        "id": "H16",
+        "name": "H16",
+        "hex": "#1D1414",
+        "r": 29,
+        "g": 20,
+        "b": 20
+    },
+    {
+        "id": "H17",
+        "name": "H17",
+        "hex": "#F1EDED",
+        "r": 241,
+        "g": 237,
+        "b": 237
+    },
+    {
+        "id": "H18",
+        "name": "H18",
+        "hex": "#FFFDF9",
+        "r": 255,
+        "g": 253,
+        "b": 249
+    },
+    {
+        "id": "H19",
+        "name": "H19",
+        "hex": "#F6FE20",
+        "r": 246,
+        "g": 254,
+        "b": 32
+    },
+    {
+        "id": "H20",
+        "name": "H20",
+        "hex": "#949FA3",
+        "r": 148,
+        "g": 159,
+        "b": 163
+    },
+    {
+        "id": "H21",
+        "name": "H21",
+        "hex": "#FFFFB1",
+        "r": 255,
+        "g": 255,
+        "b": 177
+    },
+    {
+        "id": "H22",
+        "name": "H22",
+        "hex": "#CACAD4",
+        "r": 202,
+        "g": 202,
+        "b": 212
+    },
+    {
+        "id": "H23",
+        "name": "H23",
+        "hex": "#9A0D04",
+        "r": 154,
+        "g": 13,
+        "b": 4
+    },
+    {
+        "id": "M01",
+        "name": "M01",
+        "hex": "#BCCB88",
+        "r": 188,
+        "g": 203,
+        "b": 136
+    },
+    {
+        "id": "M02",
+        "name": "M02",
+        "hex": "#F8AA36",
+        "r": 248,
+        "g": 170,
+        "b": 54
+    },
+    {
+        "id": "M03",
+        "name": "M03",
+        "hex": "#697088",
+        "r": 105,
+        "g": 112,
+        "b": 136
+    },
+    {
+        "id": "M04",
+        "name": "M04",
+        "hex": "#E3D28C",
+        "r": 227,
+        "g": 210,
+        "b": 140
+    },
+    {
+        "id": "M05",
+        "name": "M05",
+        "hex": "#D8CCAA",
+        "r": 216,
+        "g": 204,
+        "b": 170
+    },
+    {
+        "id": "M06",
+        "name": "M06",
+        "hex": "#B8A782",
+        "r": 184,
+        "g": 167,
+        "b": 130
+    },
+    {
+        "id": "M07",
+        "name": "M07",
+        "hex": "#84A497",
+        "r": 132,
+        "g": 164,
+        "b": 151
+    },
+    {
+        "id": "M08",
+        "name": "M08",
+        "hex": "#B38281",
+        "r": 179,
+        "g": 130,
+        "b": 129
+    },
+    {
+        "id": "M09",
+        "name": "M09",
+        "hex": "#A58767",
+        "r": 165,
+        "g": 135,
+        "b": 103
+    },
+    {
+        "id": "M10",
+        "name": "M10",
+        "hex": "#FC523C",
+        "r": 252,
+        "g": 82,
+        "b": 60
+    },
+    {
+        "id": "M11",
+        "name": "M11",
+        "hex": "#9F7594",
+        "r": 159,
+        "g": 117,
+        "b": 148
+    },
+    {
+        "id": "M12",
+        "name": "M12",
+        "hex": "#647490",
+        "r": 100,
+        "g": 116,
+        "b": 144
+    },
+    {
+        "id": "M13",
+        "name": "M13",
+        "hex": "#D19866",
+        "r": 209,
+        "g": 152,
+        "b": 102
+    },
+    {
+        "id": "M14",
+        "name": "M14",
+        "hex": "#FC7782",
+        "r": 252,
+        "g": 119,
+        "b": 130
+    },
+    {
+        "id": "M15",
+        "name": "M15",
+        "hex": "#757078",
+        "r": 117,
+        "g": 112,
+        "b": 120
+    }
+]
+};
+
+</script>
+    <script>
+// Global State
+let state = {
+    originalImage: null, // HTMLImageElement
+    processedGrid: [],   // 2D Array of { colorId, hex, r, g, b }
+    rawGrid: [], // 2D Array of { r, g, b, a } (Source pixels for background removal)
+    transparencyMask: new Set(), // Set of "x,y" strings
+    wandHistory: [], // Array of Sets for undo
+    isWandActive: false,
+    lastWidth: 0,
+    lastHeight: 0,
+    settings: {
+        width: 50, // Beads wide
+        palette: 'mard', // Default to new Mard palette
+        brightness: 0,
+        contrast: 0,
+        saturation: 0,
+        showGrid: true,
+        showRefGrid: false,
+        refGridSize: 29,
+        showCoords: true,
+        showCodes: true,
+        dithering: false,
+        matchMode: 'rgb', // Default RGB (Redmean)
+        autoEnhance: true,
+        preserveLines: true,
+        wandTolerance: 30,
+        resizeMode: 'dominant', // 'dominant' or 'average'
+        gridOffsetX: 0,
+        gridOffsetY: 0
+    }
+};
+
+const elements = {
+    dropzone: document.getElementById('dropzone'),
+    fileInput: document.getElementById('fileInput'),
+    controlsSection: document.getElementById('controlsSection'),
+    downloadSection: document.getElementById('downloadSection'),
+    emptyState: document.getElementById('emptyState'),
+    
+    // Inputs
+    widthRange: document.getElementById('widthRange'),
+    widthVal: document.getElementById('widthVal'),
+    paletteSelect: document.getElementById('paletteSelect'),
+    brightnessRange: document.getElementById('brightnessRange'),
+    brightnessVal: document.getElementById('brightnessVal'),
+    contrastRange: document.getElementById('contrastRange'),
+    contrastVal: document.getElementById('contrastVal'),
+    saturationRange: document.getElementById('saturationRange'),
+    saturationVal: document.getElementById('saturationVal'),
+    
+    ditheringCheck: document.getElementById('ditheringCheck'),
+    matchModeSelect: document.getElementById('matchModeSelect'),
+    resizeModeSelect: document.getElementById('resizeModeSelect'),
+    autoEnhanceCheck: document.getElementById('autoEnhanceCheck'),
+    preserveLinesCheck: document.getElementById('preserveLinesCheck'),
+    
+    gridOffsetXInput: document.getElementById('gridOffsetXInput'),
+    gridOffsetYInput: document.getElementById('gridOffsetYInput'),
+    
+    // Wand
+    toggleWandBtn: document.getElementById('toggleWandBtn'),
+    wandToleranceRange: document.getElementById('wandToleranceRange'),
+    wandToleranceVal: document.getElementById('wandToleranceVal'),
+    undoWandBtn: document.getElementById('undoWandBtn'),
+    resetWandBtn: document.getElementById('resetWandBtn'),
+    autoBgBtn: document.getElementById('autoBgBtn'),
+    wandControls: document.getElementById('bgRemovalTool'),
+    
+    // Canvas
+    canvasContainer: document.getElementById('canvasContainer'),
+    pixelCanvas: document.getElementById('pixelCanvas'),
+    processCanvas: document.createElement('canvas'),
+    previewDims: document.getElementById('previewDims'),
+    
+    // View Options
+    showGridCheck: document.getElementById('showGridCheck'),
+    showRefGridCheck: document.getElementById('showRefGridCheck'),
+    refGridSize: document.getElementById('refGridSize'),
+    showCoordsCheck: document.getElementById('showCoordsCheck'),
+    showCodesCheck: document.getElementById('showCodesCheck'),
+    
+    // BOM
+    bomSection: document.getElementById('bomSection'),
+    bomBody: document.getElementById('bomBody'),
+    
+    // Actions
+    processBtn: document.getElementById('processBtn'),
+    downloadImgBtn: document.getElementById('downloadImgBtn'),
+    downloadPdfBtn: document.getElementById('downloadPdfBtn'),
+    
+    // Slice
+    sliceBtn: document.getElementById('sliceBtn'),
+    sliceSection: document.getElementById('sliceSection'),
+    sliceContainer: document.getElementById('sliceContainer'),
+    sliceSizeInput: document.getElementById('sliceSizeInput'),
+    regenerateSlicesBtn: document.getElementById('regenerateSlicesBtn'),
+    closeSliceBtn: document.getElementById('closeSliceBtn')
+};
+
+// --- Initialization ---
+function init() {
+    setupEventListeners();
+    // Populate palette select if needed, but it's hardcoded in HTML for now. 
+    // Let's ensure 'mard' is selected by default if not present
+    if (elements.paletteSelect.value !== 'mard') {
+        // If mard exists in options, select it. If not, we might need to add it dynamically?
+        // Assuming HTML has generic options or we just override logic.
+        // Actually, let's inject options based on JS object to be safe.
+        renderPaletteOptions();
+    }
+}
+
+function renderPaletteOptions() {
+    elements.paletteSelect.innerHTML = '';
+    const options = [
+        { value: 'mard', label: '通用拼豆 (A-H 色号系统)' },
+        { value: 'perler', label: 'Perler (P系列)' },
+        { value: 'artkal', label: 'Artkal (S系列)' },
+        { value: 'hama', label: 'Hama (H系列)' }
+    ];
+    
+    options.forEach(opt => {
+        const el = document.createElement('option');
+        el.value = opt.value;
+        el.textContent = opt.label;
+        elements.paletteSelect.appendChild(el);
+    });
+    elements.paletteSelect.value = 'mard';
+}
+
+// --- Event Listeners ---
+function setupEventListeners() {
+    // Upload
+    elements.dropzone.addEventListener('click', () => elements.fileInput.click());
+    elements.dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        elements.dropzone.classList.add('border-primary', 'bg-blue-50');
+    });
+    elements.dropzone.addEventListener('dragleave', () => {
+        elements.dropzone.classList.remove('border-primary', 'bg-blue-50');
+    });
+    elements.dropzone.addEventListener('drop', handleDrop);
+    elements.fileInput.addEventListener('change', handleFileSelect);
+
+    // Controls
+    elements.widthRange.addEventListener('input', (e) => updateSetting('width', parseInt(e.target.value)));
+    elements.paletteSelect.addEventListener('change', (e) => updateSetting('palette', e.target.value));
+    elements.brightnessRange.addEventListener('input', (e) => updateSetting('brightness', parseInt(e.target.value)));
+    elements.contrastRange.addEventListener('input', (e) => updateSetting('contrast', parseInt(e.target.value)));
+    elements.saturationRange.addEventListener('input', (e) => updateSetting('saturation', parseInt(e.target.value)));
+    
+    // Advanced
+    if (elements.ditheringCheck) {
+        elements.ditheringCheck.addEventListener('change', (e) => updateSetting('dithering', e.target.checked));
+    }
+    if (elements.matchModeSelect) {
+        elements.matchModeSelect.addEventListener('change', (e) => updateSetting('matchMode', e.target.value));
+    }
+    if (elements.autoEnhanceCheck) {
+        elements.autoEnhanceCheck.addEventListener('change', (e) => updateSetting('autoEnhance', e.target.checked));
+    }
+
+    if (elements.resizeModeSelect) {
+        elements.resizeModeSelect.addEventListener('change', (e) => updateSetting('resizeMode', e.target.value));
+    }
+
+    if (elements.preserveLinesCheck) {
+        elements.preserveLinesCheck.addEventListener('change', (e) => {
+            state.settings.preserveLines = e.target.checked;
+            processImage();
+        });
+    }
+    
+    // Grid Offset
+    if (elements.gridOffsetXInput) {
+        elements.gridOffsetXInput.addEventListener('input', (e) => updateSetting('gridOffsetX', parseInt(e.target.value) || 0));
+    }
+    if (elements.gridOffsetYInput) {
+        elements.gridOffsetYInput.addEventListener('input', (e) => updateSetting('gridOffsetY', parseInt(e.target.value) || 0));
+    }
+    
+    // Wand Tool
+    if (elements.toggleWandBtn) {
+        elements.toggleWandBtn.addEventListener('click', toggleWand);
+    }
+    if (elements.wandToleranceRange) {
+        elements.wandToleranceRange.addEventListener('input', (e) => {
+            state.settings.wandTolerance = parseInt(e.target.value);
+            elements.wandToleranceVal.textContent = e.target.value;
+        });
+    }
+    if (elements.undoWandBtn) {
+        elements.undoWandBtn.addEventListener('click', undoWand);
+    }
+    if (elements.resetWandBtn) {
+        elements.resetWandBtn.addEventListener('click', resetWand);
+    }
+    if (elements.autoBgBtn) {
+        elements.autoBgBtn.addEventListener('click', autoRemoveBackground);
+    }
+    
+    // Pencil Tool Removed
+    
+    // Canvas Interaction
+    elements.pixelCanvas.addEventListener('click', handleCanvasClick);
+    
+    // Mouse Drawing Removed
+    
+    // BOM Color Selection (Visual Only)
+    elements.bomBody.addEventListener('click', (e) => {
+        const row = e.target.closest('tr');
+        if (row && row.dataset.colorId) {
+            // Remove highlight from others
+            Array.from(elements.bomBody.querySelectorAll('tr')).forEach(tr => {
+                tr.classList.remove('bg-yellow-50', 'ring-1', 'ring-yellow-300');
+            });
+            // Add highlight to selected
+            row.classList.add('bg-yellow-50', 'ring-1', 'ring-yellow-300');
+        }
+    });
+
+    elements.processBtn.addEventListener('click', processImage);
+    elements.showGridCheck.addEventListener('change', (e) => {
+        state.settings.showGrid = e.target.checked;
+        renderPreview();
+    });
+    if (elements.showRefGridCheck) {
+        elements.showRefGridCheck.addEventListener('change', (e) => {
+            state.settings.showRefGrid = e.target.checked;
+            renderPreview();
+        });
+    }
+    if (elements.refGridSize) {
+        elements.refGridSize.addEventListener('input', (e) => {
+            state.settings.refGridSize = parseInt(e.target.value) || 29;
+            renderPreview();
+        });
+    }
+    elements.showCoordsCheck.addEventListener('change', (e) => {
+        state.settings.showCoords = e.target.checked;
+        renderPreview();
+    });
+    elements.showCodesCheck.addEventListener('change', (e) => {
+        state.settings.showCodes = e.target.checked;
+        renderPreview();
+    });
+
+    // Download
+    elements.downloadImgBtn.addEventListener('click', downloadImage);
+    elements.downloadPdfBtn.addEventListener('click', downloadPDF);
+    
+    // Slice
+    if (elements.sliceBtn) {
+        elements.sliceBtn.addEventListener('click', () => generateSlices());
+    }
+    if (elements.regenerateSlicesBtn) {
+        elements.regenerateSlicesBtn.addEventListener('click', () => generateSlices());
+    }
+    if (elements.closeSliceBtn) {
+        elements.closeSliceBtn.addEventListener('click', () => {
+            elements.sliceSection.classList.add('hidden');
+        });
+    }
+}
+
+function updateSetting(key, value) {
+    state.settings[key] = value;
+    
+    // Update UI labels
+    if (key === 'width') elements.widthVal.textContent = value;
+    if (key === 'brightness') elements.brightnessVal.textContent = value > 0 ? `+${value}` : value;
+    if (key === 'contrast') elements.contrastVal.textContent = value > 0 ? `+${value}` : value;
+    if (key === 'saturation') elements.saturationVal.textContent = value > 0 ? `+${value}` : value;
+
+    // Debounce processing for sliders
+    if (['width', 'brightness', 'contrast', 'saturation'].includes(key)) {
+        debounce(processImage, 100)();
+    } else {
+        processImage();
+    }
+}
+
+// --- File Handling ---
+function handleDrop(e) {
+    e.preventDefault();
+    elements.dropzone.classList.remove('border-primary', 'bg-blue-50');
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        loadFile(e.dataTransfer.files[0]);
+    }
+}
+
+function handleFileSelect(e) {
+    if (e.target.files && e.target.files[0]) {
+        loadFile(e.target.files[0]);
+    }
+}
+
+function loadFile(file) {
+    if (!file.type.match('image.*')) {
+        alert('请上传图片文件 (JPG, PNG, GIF)');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            state.originalImage = img;
+            enableControls();
+            processImage();
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function enableControls() {
+    elements.controlsSection.classList.remove('disabled-section');
+    elements.controlsSection.classList.add('active');
+    elements.downloadSection.classList.remove('disabled-section');
+    elements.downloadSection.classList.add('active');
+    elements.emptyState.classList.add('hidden');
+    elements.pixelCanvas.classList.remove('hidden');
+    elements.bomSection.classList.remove('hidden');
+}
+
+// --- Image Processing ---
+function processImage() {
+    if (!state.originalImage) return;
+
+    const { width, palette, brightness, contrast, saturation, dithering, matchMode, autoEnhance } = state.settings;
+    const img = state.originalImage;
+    
+    // Calculate aspect ratio and new height
+    const aspectRatio = img.height / img.width;
+    const height = Math.round(width * aspectRatio);
+    
+    // Clear mask if dimensions changed
+    if (state.lastWidth !== width || state.lastHeight !== height) {
+        state.transparencyMask.clear();
+        state.wandHistory = [];
+        state.lastWidth = width;
+        state.lastHeight = height;
+    }
+
+    // Setup processing canvas (small size for pixelation)
+    const ctx = elements.processCanvas.getContext('2d');
+    elements.processCanvas.width = width;
+    elements.processCanvas.height = height;
+
+    let imageData;
+
+    // Resize Logic
+    if (state.settings.resizeMode === 'dominant') {
+        imageData = resizeImageDominant(img, width, height);
+        ctx.putImageData(imageData, 0, 0);
+    } else {
+        // Standard Average/Bilinear
+        ctx.drawImage(img, 0, 0, width, height);
+        imageData = ctx.getImageData(0, 0, width, height);
+    }
+    
+    // Get pixel data reference (for modification)
+    // Note: ctx.getImageData returns a COPY, so we need to put it back later if we modify it in place
+    // But subsequent steps (Median, Sharpen) return NEW ImageData objects, so it's fine.
+    
+    // Filters removed as per user request
+
+
+    // Apply Filters
+    let data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+        let r = data[i];
+        let g = data[i+1];
+        let b = data[i+2];
+
+        // Auto Enhance (Subtle)
+            if (autoEnhance) {
+                 const max = Math.max(r, g, b);
+                 const min = Math.min(r, g, b);
+                 const delta = max - min;
+                 if (delta > 0) {
+                     const factor = 1.05; // Reduced from 1.2 to avoid color shifting
+                     r = r + (r - min) * (factor - 1);
+                     g = g + (g - min) * (factor - 1);
+                     b = b + (b - min) * (factor - 1);
+                 }
+                 // Subtle Contrast
+                 r = (r - 128) * 1.05 + 128;
+                 g = (g - 128) * 1.05 + 128;
+                 b = (b - 128) * 1.05 + 128;
+            }
+
+        // Brightness
+        r += brightness * 2.55;
+        g += brightness * 2.55;
+        b += brightness * 2.55;
+
+        // Contrast
+        if (contrast !== 0) {
+            const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+            r = factor * (r - 128) + 128;
+            g = factor * (g - 128) + 128;
+            b = factor * (b - 128) + 128;
+        }
+
+        // Saturation
+        if (saturation !== 0) {
+            const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
+            const satMultiplier = 1 + (saturation / 100); 
+            r = gray + (r - gray) * satMultiplier;
+            g = gray + (g - gray) * satMultiplier;
+            b = gray + (b - gray) * satMultiplier;
+        }
+
+        data[i] = Math.min(255, Math.max(0, r));
+        data[i+1] = Math.min(255, Math.max(0, g));
+        data[i+2] = Math.min(255, Math.max(0, b));
+    }
+
+    // Capture Raw Grid (For Background Removal) - BEFORE Posterization
+    // This ensures we can distinguish subtle dark background from black outlines
+    const rawGrid = []; 
+    for (let y = 0; y < height; y++) {
+        const rawRow = [];
+        for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            rawRow.push({ 
+                r: data[idx], 
+                g: data[idx+1], 
+                b: data[idx+2], 
+                a: data[idx+3] 
+            });
+        }
+        rawGrid.push(rawRow);
+    }
+    state.rawGrid = rawGrid;
+    
+    data = imageData.data; // Update reference just in case
+
+    // Color Quantization & Dithering
+    let currentPalette = PALETTES[palette] || PALETTES['mard'];
+    
+    // Pre-calculate LAB
+    if (matchMode === 'lab' && !currentPalette[0].lab) {
+        currentPalette.forEach(c => {
+            c.lab = rgbToLab(c.r, c.g, c.b);
+        });
+    }
+
+    let newGrid = []; // 2D array [y][x]
+    const floatData = new Float32Array(data);
+
+    for (let y = 0; y < height; y++) {
+        const row = [];
+        for (let x = 0; x < width; x++) {
+            const idx = (y * width + x) * 4;
+            
+            const oldR = floatData[idx];
+            const oldG = floatData[idx+1];
+            const oldB = floatData[idx+2];
+            const a = floatData[idx+3];
+            
+            if (a < 128) {
+                row.push(null);
+                continue;
+            }
+
+            // Find Closest Color
+            let match = findClosestColor(oldR, oldG, oldB, currentPalette, matchMode);
+            
+            row.push(match);
+
+            // Dithering (Floyd-Steinberg)
+            if (dithering) {
+                const quantR = match.r;
+                const quantG = match.g;
+                const quantB = match.b;
+
+                const errR = oldR - quantR;
+                const errG = oldG - quantG;
+                const errB = oldB - quantB;
+
+                const distribute = (dx, dy, factor) => {
+                    if (x + dx >= 0 && x + dx < width && y + dy >= 0 && y + dy < height) {
+                        const nIdx = ((y + dy) * width + (x + dx)) * 4;
+                        floatData[nIdx] += errR * factor;
+                        floatData[nIdx+1] += errG * factor;
+                        floatData[nIdx+2] += errB * factor;
+                    }
+                };
+
+                distribute(1, 0, 7/16);
+                distribute(-1, 1, 3/16);
+                distribute(0, 1, 5/16);
+                distribute(1, 1, 1/16);
+            }
+        }
+        newGrid.push(row);
+    }
+
+    state.processedGrid = newGrid;
+    elements.previewDims.textContent = `${width} x ${height}`;
+    
+    renderPreview();
+    updateBOM();
+}
+
+function findClosestColor(r, g, b, palette, mode) {
+    let minDist = Infinity;
+    let closest = palette[0];
+
+    // Cache target LAB if needed
+    let targetLab = null;
+
+    if (mode === 'lab') {
+        targetLab = rgbToLab(r, g, b);
+    }
+
+    for (const color of palette) {
+        let dist;
+        if (mode === 'lab') {
+            // Balanced Delta E (Prioritize Hue Accuracy)
+            const dl = (targetLab.l - color.lab.l) * 1.0; 
+            const da = (targetLab.a - color.lab.a) * 1.2; // Increase weight for Red-Green axis
+            const db = (targetLab.b - color.lab.b) * 1.2; // Increase weight for Blue-Yellow axis
+            dist = Math.sqrt(dl * dl + da * da + db * db);
+
+            // Green Noise Reduction Heuristic (Enhanced V2)
+            // 1. Strong protection for Warm colors (Red/Orange/Brown) against Green/Teal
+            // Expanded range: a > -2 (covers weak browns) and b > 5 (yellowish)
+            if (targetLab.a > -2 && targetLab.b > 5 && color.lab.a < -5) {
+                dist += 35; // Increased penalty to prevent orange shadows turning green
+            }
+            // 2. Standard protection for Neutrals/Skin against Green
+            // If target is not Green (a > -5), and candidate is very Green (a < -10)
+            else if (targetLab.a > -5 && color.lab.a < -10) {
+                 // Exception: High B (Yellows) are allowed to be slightly green-shifted in Lab
+                 if (targetLab.b < 45) {
+                    dist += 20;
+                 }
+            }
+        } else {
+            // Redmean Color Distance (Better than Euclidean for RGB)
+            // As used in sucr233's bead tool
+            const rmean = (r + color.r) / 2;
+            const rd = r - color.r;
+            const gd = g - color.g;
+            const bd = b - color.b;
+            dist = (((512 + rmean) * rd * rd) >> 8) + 4 * gd * gd + (((767 - rmean) * bd * bd) >> 8);
+        }
+        
+        // Removed complex heuristics (Warm/Green/Saturation penalties) 
+        // to provide more predictable and faithful color matching as requested.
+
+        if (dist < minDist) {
+            minDist = dist;
+            closest = color;
+        }
+    }
+    return closest;
+}
+
+// --- Color Utils (LAB) ---
+function rgbToLab(r, g, b) {
+    // RGB to XYZ
+    let r1 = r / 255, g1 = g / 255, b1 = b / 255;
+    r1 = (r1 > 0.04045) ? Math.pow((r1 + 0.055) / 1.055, 2.4) : r1 / 12.92;
+    g1 = (g1 > 0.04045) ? Math.pow((g1 + 0.055) / 1.055, 2.4) : g1 / 12.92;
+    b1 = (b1 > 0.04045) ? Math.pow((b1 + 0.055) / 1.055, 2.4) : b1 / 12.92;
+
+    r1 *= 100; g1 *= 100; b1 *= 100;
+
+    const x = r1 * 0.4124 + g1 * 0.3576 + b1 * 0.1805;
+    const y = r1 * 0.2126 + g1 * 0.7152 + b1 * 0.0722;
+    const z = r1 * 0.0193 + g1 * 0.1192 + b1 * 0.9505;
+
+    // XYZ to Lab
+    let x1 = x / 95.047, y1 = y / 100.000, z1 = z / 108.883;
+    x1 = (x1 > 0.008856) ? Math.pow(x1, 1/3) : (7.787 * x1) + (16/116);
+    y1 = (y1 > 0.008856) ? Math.pow(y1, 1/3) : (7.787 * y1) + (16/116);
+    z1 = (z1 > 0.008856) ? Math.pow(z1, 1/3) : (7.787 * z1) + (16/116);
+
+    return {
+        l: (116 * y1) - 16,
+        a: 500 * (x1 - y1),
+        b: 200 * (y1 - z1)
+    };
+}
+
+function deltaE(lab1, lab2) {
+    // CIE76 Delta E
+    const dl = lab1.l - lab2.l;
+    const da = lab1.a - lab2.a;
+    const db = lab1.b - lab2.b;
+    return Math.sqrt(dl * dl + da * da + db * db);
+}
+
+// --- Rendering ---
+function renderPreview() {
+    if (state.processedGrid.length === 0) return;
+
+    const grid = state.processedGrid;
+    const height = grid.length;
+    const width = grid[0].length;
+    
+    // Scale for display
+    const containerWidth = elements.canvasContainer.clientWidth - 40;
+    const maxPixelSize = 30;
+    const minPixelSize = 8; 
+    
+    let pixelSize = Math.floor(containerWidth / width);
+    const coordOffset = state.settings.showCoords ? 20 : 0;
+    
+    if (state.settings.showCoords) {
+        pixelSize = Math.floor((containerWidth - coordOffset) / width);
+    }
+    
+    if (pixelSize > maxPixelSize) pixelSize = maxPixelSize;
+    if (pixelSize < minPixelSize) pixelSize = minPixelSize;
+
+    const canvas = elements.pixelCanvas;
+    const totalWidth = (width * pixelSize) + coordOffset;
+    const totalHeight = (height * pixelSize) + coordOffset;
+    
+    canvas.width = totalWidth;
+    canvas.height = totalHeight;
+    canvas.style.display = 'block';
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Draw Coordinates
+    if (state.settings.showCoords) {
+        ctx.fillStyle = '#666';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // X Axis
+        for (let x = 0; x < width; x += 5) {
+            ctx.fillText(x, coordOffset + (x * pixelSize) + (pixelSize/2), 10);
+            ctx.beginPath();
+            ctx.moveTo(coordOffset + (x * pixelSize) + (pixelSize/2), 15);
+            ctx.lineTo(coordOffset + (x * pixelSize) + (pixelSize/2), 20);
+            ctx.stroke();
+        }
+
+        // Y Axis
+        for (let y = 0; y < height; y += 5) {
+            ctx.fillText(y, 10, coordOffset + (y * pixelSize) + (pixelSize/2));
+            ctx.beginPath();
+            ctx.moveTo(15, coordOffset + (y * pixelSize) + (pixelSize/2));
+            ctx.lineTo(20, coordOffset + (y * pixelSize) + (pixelSize/2));
+            ctx.stroke();
+        }
+    }
+
+    // Draw Grid
+    const startX = coordOffset;
+    const startY = coordOffset;
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const color = grid[y][x];
+            
+            // Check Transparency Mask
+            if (state.transparencyMask.has(`${x},${y}`) || !color) {
+                // Draw checkerboard for transparency
+                ctx.fillStyle = ((x + y) % 2 === 0) ? '#e5e7eb' : '#ffffff';
+                ctx.fillRect(startX + x * pixelSize, startY + y * pixelSize, pixelSize, pixelSize);
+                continue;
+            }
+
+            // Fill Cell
+            ctx.fillStyle = color.hex;
+            ctx.fillRect(startX + x * pixelSize, startY + y * pixelSize, pixelSize, pixelSize);
+
+            // Draw Grid Lines
+            if (state.settings.showGrid) {
+                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(startX + x * pixelSize, startY + y * pixelSize, pixelSize, pixelSize);
+            }
+
+            // Draw Color Code
+            if (state.settings.showCodes && pixelSize >= 8) {
+                // Calculate Luma for text color
+                const luma = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+                ctx.fillStyle = luma > 128 ? '#000' : '#fff';
+                
+                // Allow smaller font for smaller pixels
+                const fontSize = Math.max(6, pixelSize / 2.5);
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                // Show short ID (A1, H23)
+                ctx.fillText(color.id, startX + x * pixelSize + pixelSize/2, startY + y * pixelSize + pixelSize/2);
+            }
+        }
+    }
+
+    // Draw Reference Grid (Big Grid)
+    if (state.settings.showRefGrid) {
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.6)';
+        ctx.lineWidth = 2;
+        const refSize = state.settings.refGridSize || 29;
+        
+        // Vertical lines
+        for (let x = refSize; x < width; x += refSize) {
+             const px = startX + x * pixelSize;
+             ctx.beginPath();
+             ctx.moveTo(px, startY);
+             ctx.lineTo(px, startY + height * pixelSize);
+             ctx.stroke();
+        }
+        
+        // Horizontal lines
+        for (let y = refSize; y < height; y += refSize) {
+             const py = startY + y * pixelSize;
+             ctx.beginPath();
+             ctx.moveTo(startX, py);
+             ctx.lineTo(startX + width * pixelSize, py);
+             ctx.stroke();
+        }
+    }
+}
+
+function updateBOM() {
+    if (state.processedGrid.length === 0) return;
+    
+    const counts = {};
+    
+    state.processedGrid.forEach((row, y) => {
+        row.forEach((color, x) => {
+            if (color && !state.transparencyMask.has(`${x},${y}`)) {
+                if (!counts[color.id]) {
+                    counts[color.id] = { ...color, count: 0 };
+                }
+                counts[color.id].count++;
+            }
+        });
+    });
+
+    const sorted = Object.values(counts).sort((a, b) => {
+        return a.id.localeCompare(b.id, undefined, { numeric: true });
+    });
+
+    elements.bomBody.innerHTML = sorted.map(c => `
+        <tr class="hover:bg-gray-50 cursor-pointer transition-colors" data-color-id="${c.id}" title="点击选择此颜色进行绘制">
+            <td class="px-6 py-4 whitespace-nowrap">
+                <div class="h-6 w-6 rounded-full border border-gray-200 shadow-sm" style="background-color: ${c.hex}"></div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <span class="font-medium">${c.id}</span> - ${c.name}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                ${c.count}
+            </td>
+        </tr>
+    `).join('');
+}
+
+// --- Utils ---
+let debounceTimer;
+function debounce(func, timeout = 300) {
+    return (...args) => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => { func.apply(this, args); }, timeout);
+    };
+}
+
+// --- Download ---
+function downloadImage() {
+    if (state.processedGrid.length === 0) return;
+
+    const grid = state.processedGrid;
+    const height = grid.length;
+    const width = grid[0].length;
+    
+    // Calculate BOM for Legend
+    const counts = {};
+    grid.forEach((row, y) => {
+        row.forEach((color, x) => {
+            if (color && !state.transparencyMask.has(`${x},${y}`)) {
+                if (!counts[color.id]) {
+                    counts[color.id] = { ...color, count: 0 };
+                }
+                counts[color.id].count++;
+            }
+        });
+    });
+    const sortedColors = Object.values(counts).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
+    // Dimensions
+    const pixelSize = 30; // Large enough for text
+    const coordSize = 40; // Space for axis numbers
+    const titleHeight = 60; // Title + Date
+    const margin = 20;
+    
+    // Legend Calculation
+    const legendItemWidth = 120;
+    const legendItemHeight = 40;
+    const contentWidth = width * pixelSize;
+    const totalCanvasWidth = Math.max(contentWidth + coordSize + margin * 2, 800); // Min width for aesthetics
+    
+    const itemsPerRow = Math.floor((totalCanvasWidth - margin * 2) / legendItemWidth);
+    const legendRows = Math.ceil(sortedColors.length / itemsPerRow);
+    const legendHeight = legendRows * legendItemHeight + 40; // +Header
+    
+    const totalCanvasHeight = titleHeight + coordSize + (height * pixelSize) + legendHeight + margin * 2;
+
+    // Create Canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = totalCanvasWidth;
+    canvas.height = totalCanvasHeight;
+    const ctx = canvas.getContext('2d');
+    
+    // Background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, totalCanvasWidth, totalCanvasHeight);
+    
+    // 1. Title Header
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText("像素图纸 (Pixel Art Pattern)", margin, margin);
+    
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#666';
+    const dateStr = new Date().toLocaleDateString();
+    ctx.fillText(`Export date: ${dateStr}`, margin, margin + 35);
+    
+    // Grid Offset
+    const gridStartX = Math.floor((totalCanvasWidth - (width * pixelSize) - coordSize) / 2) + coordSize; 
+    const gridStartY = titleHeight + margin + coordSize;
+
+    // 2. Coordinates
+    ctx.fillStyle = '#000';
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // X Axis (Top)
+    for (let x = 0; x < width; x++) {
+        const cx = gridStartX + x * pixelSize + pixelSize/2;
+        ctx.fillText(x + 1, cx, gridStartY - 15);
+        // Tick
+        ctx.beginPath();
+        ctx.moveTo(cx, gridStartY - 5);
+        ctx.lineTo(cx, gridStartY);
+        ctx.stroke();
+    }
+    
+    // Y Axis (Left)
+    for (let y = 0; y < height; y++) {
+        const cy = gridStartY + y * pixelSize + pixelSize/2;
+        ctx.fillText(y + 1, gridStartX - 15, cy);
+        // Tick
+        ctx.beginPath();
+        ctx.moveTo(gridStartX - 5, cy);
+        ctx.lineTo(gridStartX, cy);
+        ctx.stroke();
+    }
+
+    // 3. Draw Grid & Pixels
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const px = gridStartX + x * pixelSize;
+            const py = gridStartY + y * pixelSize;
+            
+            const color = grid[y][x];
+            
+            // Transparency Check
+            if (state.transparencyMask.has(`${x},${y}`) || !color) {
+                // Empty white block (already filled by background)
+                // Draw light grid line
+                ctx.strokeStyle = '#eee';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(px, py, pixelSize, pixelSize);
+                continue;
+            }
+
+            // Fill Color
+            ctx.fillStyle = color.hex;
+            ctx.fillRect(px, py, pixelSize, pixelSize);
+            
+            // Grid Line
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px, py, pixelSize, pixelSize);
+            
+            // Text Label (Always draw if not transparent)
+            // Determine text color based on Luma
+            const luma = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+            ctx.fillStyle = luma > 128 ? '#000' : '#fff';
+            
+            // Font sizing
+            ctx.font = 'bold 11px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(color.id, px + pixelSize/2, py + pixelSize/2);
+        }
+    }
+    
+    // 4. Draw Legend (BOM)
+    const legendStartY = gridStartY + (height * pixelSize) + 40;
+    
+    ctx.fillStyle = '#333';
+    ctx.font = 'bold 18px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText("颜色用量表 (Color Legend)", margin, legendStartY);
+    
+    const itemsStartY = legendStartY + 30;
+    
+    sortedColors.forEach((c, index) => {
+        const row = Math.floor(index / itemsPerRow);
+        const col = index % itemsPerRow;
+        
+        const itemX = margin + (col * legendItemWidth);
+        const itemY = itemsStartY + (row * legendItemHeight);
+        
+        // Swatch
+        ctx.fillStyle = c.hex;
+        ctx.fillRect(itemX, itemY, 20, 20);
+        ctx.strokeStyle = '#ccc';
+        ctx.strokeRect(itemX, itemY, 20, 20);
+        
+        // Text
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(c.id, itemX + 28, itemY + 10);
+        
+        ctx.font = '11px Arial';
+        ctx.fillStyle = '#666';
+        ctx.fillText(`: ${c.count}`, itemX + 60, itemY + 10);
+    });
+
+    // Trigger Download
+    const link = document.createElement('a');
+    link.download = `pixel-pattern-${new Date().getTime()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+async function downloadPDF() {
+    const { jsPDF } = window.jspdf;
+    
+    const grid = state.processedGrid;
+    if (grid.length === 0) return;
+    
+    const height = grid.length;
+    const width = grid[0].length;
+    const isLandscape = width > height;
+    
+    const doc = new jsPDF({
+        orientation: isLandscape ? 'l' : 'p',
+        unit: 'mm',
+        format: 'a4'
+    });
+    
+    // Add unicode font support if needed, but for now using standard font
+    // Note: jsPDF standard fonts don't support Chinese characters.
+    // Ideally we should add a font, but for now we'll stick to English labels where possible or hope for best.
+    
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    
+    // Title
+    doc.setFontSize(16);
+    doc.text("拼豆图纸 (Pixel Art Pattern)", pageWidth / 2, margin + 5, null, null, "center");
+    
+    // Calculate cell size
+    const availWidth = pageWidth - (margin * 2);
+    const availHeight = pageHeight - (margin * 3) - 10; 
+    const coordSize = 6; 
+    const maxCellWidth = (availWidth - coordSize) / width;
+    const maxCellHeight = (availHeight - coordSize) / height;
+    const cellSize = Math.min(maxCellWidth, maxCellHeight);
+    
+    const startX = margin + coordSize;
+    const startY = margin + 15 + coordSize; 
+    
+    // Draw Coords (Numbers)
+    doc.setFontSize(6);
+    doc.setTextColor(0, 0, 0);
+    
+    // X Axis
+    for (let x = 0; x < width; x++) {
+        if ((x + 1) % 5 === 0 || x === 0 || x === width - 1) {
+            const xPos = startX + (x * cellSize) + (cellSize / 2);
+            doc.text(`${x + 1}`, xPos, startY - 2, null, null, "center");
+        }
+    }
+    
+    // Y Axis
+    for (let y = 0; y < height; y++) {
+        if ((y + 1) % 5 === 0 || y === 0 || y === height - 1) {
+            const yPos = startY + (y * cellSize) + (cellSize / 2);
+            doc.text(`${y + 1}`, margin + 2, yPos + 1); 
+        }
+    }
+    
+    // Draw Grid
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const color = grid[y][x];
+            
+            if (state.transparencyMask.has(`${x},${y}`) || !color) {
+                continue;
+            }
+
+            const px = startX + x * cellSize;
+            const py = startY + y * cellSize;
+            
+            doc.setFillColor(color.r, color.g, color.b);
+            doc.rect(px, py, cellSize, cellSize, 'F');
+            
+            const luma = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+            doc.setTextColor(luma < 128 ? 255 : 0);
+            
+            let fontSize = cellSize * 0.4; 
+            if (fontSize > 6) fontSize = 6;
+            if (fontSize < 3) fontSize = 3;
+            
+            doc.setFontSize(fontSize);
+            doc.text(color.id, px + cellSize/2, py + cellSize/2 + (fontSize/3), null, null, "center");
+        }
+    }
+    
+    // Add BOM Page
+    doc.addPage();
+    doc.setFontSize(14);
+    doc.text("颜色用量表 (Color BOM)", margin, margin + 10);
+    
+    // Recalculate counts for BOM
+    const counts = {};
+    grid.forEach((row, y) => {
+        row.forEach((c, x) => {
+            if(c && !state.transparencyMask.has(`${x},${y}`)) {
+                if(!counts[c.id]) counts[c.id] = { ...c, count: 0};
+                counts[c.id].count++;
+            }
+        });
+    });
+    
+    const sorted = Object.values(counts).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+    
+    let yPos = margin + 20;
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    
+    sorted.forEach(c => {
+        if (yPos > pageHeight - margin) {
+            doc.addPage();
+            yPos = margin + 20;
+        }
+        
+        // Draw little color box
+        doc.setFillColor(c.r, c.g, c.b);
+        doc.rect(margin, yPos - 4, 6, 6, 'F');
+        doc.rect(margin, yPos - 4, 6, 6, 'S'); // Border
+        
+        doc.text(`${c.id} - ${c.name}: ${c.count} 颗`, margin + 10, yPos);
+        yPos += 8;
+    });
+    
+    doc.save('pixel-pattern.pdf');
+}
+
+// 2. Magic Wand Tool
+function toggleWand() {
+    state.isWandActive = !state.isWandActive;
+    updateWandUI();
+}
+
+function updateWandUI() {
+    if (state.isWandActive) {
+        elements.toggleWandBtn.textContent = '退出魔棒';
+        elements.toggleWandBtn.classList.remove('bg-white', 'text-blue-600');
+        elements.toggleWandBtn.classList.add('bg-blue-600', 'text-white');
+        elements.wandControls.classList.remove('hidden');
+        elements.pixelCanvas.style.cursor = 'crosshair';
+    } else {
+        elements.toggleWandBtn.textContent = '启用魔棒';
+        elements.toggleWandBtn.classList.add('bg-white', 'text-blue-600');
+        elements.toggleWandBtn.classList.remove('bg-blue-600', 'text-white');
+        elements.wandControls.classList.add('hidden');
+        elements.pixelCanvas.style.cursor = 'default';
+    }
+}
+
+function handleCanvasClick(e) {
+    if (!state.isWandActive || state.processedGrid.length === 0) return;
+    
+    const rect = elements.pixelCanvas.getBoundingClientRect();
+    const scaleX = elements.pixelCanvas.width / rect.width;
+    const scaleY = elements.pixelCanvas.height / rect.height;
+    
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+    
+    const grid = state.processedGrid;
+    const height = grid.length;
+    const width = grid[0].length;
+    
+    // Calculate pixel size (should match renderPreview logic)
+    const containerWidth = elements.canvasContainer.clientWidth - 40;
+    const maxPixelSize = 30;
+    const minPixelSize = 8; 
+    const coordOffset = state.settings.showCoords ? 20 : 0;
+    
+    let pixelSize = Math.floor((state.settings.showCoords ? (containerWidth - coordOffset) : containerWidth) / width);
+    if (state.settings.showCoords) {
+        pixelSize = Math.floor((containerWidth - coordOffset) / width);
+    }
+    
+    if (pixelSize > maxPixelSize) pixelSize = maxPixelSize;
+    if (pixelSize < minPixelSize) pixelSize = minPixelSize;
+    
+    const startX = coordOffset;
+    const startY = coordOffset;
+    
+    const gridX = Math.floor((clickX - startX) / pixelSize);
+    const gridY = Math.floor((clickY - startY) / pixelSize);
+    
+    if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) return;
+    
+    // Pencil Mode Removed
+    
+    // Wand Mode logic...
+    // Perform Flood Fill Remove
+    // Use RAW color for click target too if available
+    const targetColor = state.rawGrid ? state.rawGrid[gridY][gridX] : grid[gridY][gridX];
+    
+    if (!targetColor) return; // Already transparent
+    
+    // Save state for undo
+    state.wandHistory.push(new Set(state.transparencyMask));
+    
+    floodFillRemove(gridX, gridY, targetColor, width, height, !!state.rawGrid);
+    
+    renderPreview();
+    updateBOM();
+}
+
+function floodFillRemove(startX, startY, targetColor, width, height, useRaw = false) {
+    const queue = [[startX, startY]];
+    const seen = new Set();
+    const tolerance = state.settings.wandTolerance;
+    
+    // Helper to get color difference
+    const getColorDiff = (c1, c2) => {
+        // Simple RGB euclidean
+        return Math.sqrt(
+            Math.pow(c1.r - c2.r, 2) + 
+            Math.pow(c1.g - c2.g, 2) + 
+            Math.pow(c1.b - c2.b, 2)
+        );
+    };
+    
+    while (queue.length > 0) {
+        const [x, y] = queue.pop();
+        const key = `${x},${y}`;
+        
+        if (seen.has(key)) continue;
+        seen.add(key);
+        
+        if (x < 0 || x >= width || y < 0 || y >= height) continue;
+        
+        // If already masked, stop (act as boundary)? Or treat as empty?
+        // Usually we traverse visible pixels.
+        if (state.transparencyMask.has(key)) continue;
+        
+        const currentColor = useRaw ? state.rawGrid[y][x] : state.processedGrid[y][x];
+        if (!currentColor) continue;
+        
+        const diff = getColorDiff(targetColor, currentColor);
+        
+        // RGB Distance max is ~441. 
+        // Tolerance 0-100 maps to 0-441 approx? Or just 0-100 raw distance?
+        // Let's use raw distance for better control. 
+        // 30 is a good default (approx 10% variation).
+        // Let's map slider 0-100 to 0-200 distance.
+        const threshold = tolerance * 2;
+        
+        if (diff <= threshold) {
+            state.transparencyMask.add(key);
+            
+            queue.push([x + 1, y]);
+            queue.push([x - 1, y]);
+            queue.push([x, y + 1]);
+            queue.push([x, y - 1]);
+        }
+    }
+}
+
+function undoWand() {
+    if (state.wandHistory.length > 0) {
+        state.transparencyMask = state.wandHistory.pop();
+        renderPreview();
+        updateBOM();
+    }
+}
+
+function resetWand() {
+    if (state.transparencyMask.size > 0) {
+        state.wandHistory.push(new Set(state.transparencyMask));
+        state.transparencyMask.clear();
+        renderPreview();
+        updateBOM();
+    }
+}
+
+function autoRemoveBackground() {
+    if (state.processedGrid.length === 0) return;
+    
+    // Save state for undo
+    state.wandHistory.push(new Set(state.transparencyMask));
+    
+    const grid = state.processedGrid;
+    const height = grid.length;
+    const width = grid[0].length;
+    
+    // Check 4 corners
+    const corners = [
+        [0, 0],
+        [width - 1, 0],
+        [0, height - 1],
+        [width - 1, height - 1]
+    ];
+    
+    let changed = false;
+    
+    corners.forEach(([x, y]) => {
+        const key = `${x},${y}`;
+        if (!state.transparencyMask.has(key)) {
+            // Use Raw Grid for more accurate background detection
+            const color = state.rawGrid[y][x];
+            // Also need quantized color to verify it's valid
+            const quantColor = grid[y][x];
+
+            if (color && quantColor) {
+                // Adaptive tolerance for dark backgrounds
+                // If corner is very dark (Black), use higher tolerance to catch compression artifacts
+                // BUT be careful not to eat black outlines.
+                // Reverted aggressive boost. Rely on standard tolerance but on RAW pixels.
+                
+                floodFillRemove(x, y, color, width, height, true); // true = useRaw
+                
+                changed = true;
+            }
+        }
+    });
+    
+    if (changed) {
+        renderPreview();
+        updateBOM();
+    }
+}
+
+// --- Pencil Tool Removed ---
+
+
+
+// K-Means Color Quantization removed
+
+
+function resizeImageDominant(img, targetWidth, targetHeight) {
+    // Smart Resizing Config
+    const QUANTIZE_STEP = 24; // Keep 24 for color consistency
+    const PRESERVE_LINES = state.settings.preserveLines !== false; 
+    const LINE_BOOST_THRESHOLD = 130; // Adjusted to focus on dark lines and shadows
+    const LINE_BOOST_WEIGHT = PRESERVE_LINES ? 20.0 : 1.0; // Massive boost to ensure broken lines are closed 
+
+    // 1. Get full source data
+    // Use an offscreen canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const srcData = ctx.getImageData(0, 0, img.width, img.height).data;
+    
+    // 2. Prepare target
+    const output = new ImageData(targetWidth, targetHeight);
+    const dstData = output.data;
+    
+    const scaleX = img.width / targetWidth;
+    const scaleY = img.height / targetHeight;
+    
+    // Grid Offset
+    const offX = state.settings.gridOffsetX || 0;
+    const offY = state.settings.gridOffsetY || 0;
+    
+    for (let y = 0; y < targetHeight; y++) {
+        for (let x = 0; x < targetWidth; x++) {
+            // Define sampling region
+            const srcX = Math.floor(x * scaleX) + offX;
+            const srcY = Math.floor(y * scaleY) + offY;
+            // Ensure we sample at least 1 pixel
+            const srcW = Math.max(1, Math.floor((x + 1) * scaleX) - Math.floor(x * scaleX));
+            const srcH = Math.max(1, Math.floor((y + 1) * scaleY) - Math.floor(y * scaleY));
+            
+            // Collect colors in this region
+            const histogram = {};
+            let maxScore = 0;
+            let bestKey = null;
+            let hasVisible = false;
+            
+            // Optimization: If 1x1 sampling, just take the pixel
+            if (srcW === 1 && srcH === 1) {
+                if (srcX >= 0 && srcX < img.width && srcY >= 0 && srcY < img.height) {
+                    const idx = (srcY * img.width + srcX) * 4;
+                    dstData[(y * targetWidth + x) * 4] = srcData[idx];
+                    dstData[(y * targetWidth + x) * 4 + 1] = srcData[idx+1];
+                    dstData[(y * targetWidth + x) * 4 + 2] = srcData[idx+2];
+                    dstData[(y * targetWidth + x) * 4 + 3] = srcData[idx+3];
+                } else {
+                     dstData[(y * targetWidth + x) * 4 + 3] = 0;
+                }
+                continue;
+            }
+
+            for (let sy = srcY; sy < srcY + srcH; sy++) {
+                if (sy < 0 || sy >= img.height) continue;
+                for (let sx = srcX; sx < srcX + srcW; sx++) {
+                    if (sx < 0 || sx >= img.width) continue;
+                    
+                    const idx = (sy * img.width + sx) * 4;
+                    const a = srcData[idx+3];
+                    
+                    if (a < 128) continue; 
+                    hasVisible = true;
+
+                    const r = srcData[idx];
+                    const g = srcData[idx+1];
+                    const b = srcData[idx+2];
+                    
+                    // Quantize Key (Group similar colors)
+                    const qr = Math.round(r / QUANTIZE_STEP) * QUANTIZE_STEP;
+                    const qg = Math.round(g / QUANTIZE_STEP) * QUANTIZE_STEP;
+                    const qb = Math.round(b / QUANTIZE_STEP) * QUANTIZE_STEP;
+                    const key = `${qr},${qg},${qb}`;
+                    
+                    // Calculate Weight
+                    let weight = 1.0;
+                    if (PRESERVE_LINES) {
+                        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                        if (luminance < LINE_BOOST_THRESHOLD) {
+                            weight = LINE_BOOST_WEIGHT;
+                        }
+                    }
+                    
+                    if (!histogram[key]) {
+                        histogram[key] = { score: 0, rSum: 0, gSum: 0, bSum: 0, count: 0 };
+                    }
+                    
+                    histogram[key].score += weight;
+                    histogram[key].rSum += r;
+                    histogram[key].gSum += g;
+                    histogram[key].bSum += b;
+                    histogram[key].count++;
+                    
+                    if (histogram[key].score > maxScore) {
+                        maxScore = histogram[key].score;
+                        bestKey = key;
+                    }
+                }
+            }
+            
+            // Assign winner
+            const dstIdx = (y * targetWidth + x) * 4;
+            if (!hasVisible || !bestKey) {
+                dstData[dstIdx] = 0;
+                dstData[dstIdx+1] = 0;
+                dstData[dstIdx+2] = 0;
+                dstData[dstIdx+3] = 0;
+            } else {
+                const bucket = histogram[bestKey];
+                dstData[dstIdx] = Math.round(bucket.rSum / bucket.count);
+                dstData[dstIdx+1] = Math.round(bucket.gSum / bucket.count);
+                dstData[dstIdx+2] = Math.round(bucket.bSum / bucket.count);
+                dstData[dstIdx+3] = 255;
+            }
+        }
+    }
+    return output;
+}
+
+// --- Slicing ---
+function generateSlices() {
+    if (state.processedGrid.length === 0) return;
+    
+    const sliceSize = parseInt(elements.sliceSizeInput.value) || 29;
+    const grid = state.processedGrid;
+    const height = grid.length;
+    const width = grid[0].length;
+    
+    const rows = Math.ceil(height / sliceSize);
+    const cols = Math.ceil(width / sliceSize);
+    
+    elements.sliceContainer.innerHTML = '';
+    elements.sliceSection.classList.remove('hidden');
+    
+    // Create temp canvas for slicing
+    const canvas = document.createElement('canvas');
+    const pixelSize = 20; // Fixed size for slice images
+    const padding = 20;
+    
+    // We need to render each slice
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const startX = c * sliceSize;
+            const startY = r * sliceSize;
+            
+            // Calculate slice dimensions
+            const sliceW = Math.min(sliceSize, width - startX);
+            const sliceH = Math.min(sliceSize, height - startY);
+            
+            // Set canvas size
+            const totalW = sliceW * pixelSize + padding * 2;
+            const totalH = sliceH * pixelSize + padding * 2;
+            canvas.width = totalW;
+            canvas.height = totalH;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, totalW, totalH);
+            
+            // Draw Grid & Pixels
+            for (let y = 0; y < sliceH; y++) {
+                for (let x = 0; x < sliceW; x++) {
+                    const gx = startX + x;
+                    const gy = startY + y;
+                    const color = grid[gy][gx];
+                    
+                    const px = padding + x * pixelSize;
+                    const py = padding + y * pixelSize;
+                    
+                    if (state.transparencyMask.has(`${gx},${gy}`) || !color) {
+                         // Empty
+                         ctx.strokeStyle = '#eee';
+                         ctx.strokeRect(px, py, pixelSize, pixelSize);
+                         continue;
+                    }
+                    
+                    ctx.fillStyle = color.hex;
+                    ctx.fillRect(px, py, pixelSize, pixelSize);
+                    
+                    ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    ctx.strokeRect(px, py, pixelSize, pixelSize);
+                    
+                    // Symbol/Text
+                    const luma = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+                    ctx.fillStyle = luma > 128 ? '#000' : '#fff';
+                    ctx.font = 'bold 8px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(color.id, px + pixelSize/2, py + pixelSize/2);
+                }
+            }
+            
+            // Add Coordinates Text
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Slice ${r+1}-${c+1} (${startX+1},${startY+1})`, 5, 12);
+            
+            // Create Image Element
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            img.className = 'w-full border border-gray-200 rounded shadow-sm hover:shadow-md transition cursor-pointer';
+            img.title = `Click to download slice ${r+1}-${c+1}`;
+            
+            // Wrap in div with label
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex flex-col items-center';
+            wrapper.appendChild(img);
+            
+            const label = document.createElement('span');
+            label.className = 'text-xs text-gray-500 mt-1';
+            label.textContent = `Part ${r+1}-${c+1}`;
+            wrapper.appendChild(label);
+            
+            // Click to download
+            img.onclick = () => {
+                const link = document.createElement('a');
+                link.download = `pixel-art-slice-${r+1}-${c+1}.png`;
+                link.href = img.src;
+                link.click();
+            };
+            
+            elements.sliceContainer.appendChild(wrapper);
+        }
+    }
+}
+
+// Start
+init();
+
+</script>
+</body>
+</html>
