@@ -55,5 +55,5 @@
 ## 📝 许可证 (License)
 
 MIT License
-## https://sunjx3316-cell.github.io/-/
+## https://sunjx3316-cell.github.io/perler-pattern-generator/
 这个是应用链接，可点击直用。
