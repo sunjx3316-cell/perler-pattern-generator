@@ -202,11 +202,50 @@
                     </button>
                 </div>
 
+                <!-- Post-processing workshop -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-violet-100 disabled-section" id="workshopSection">
+                    <div class="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                            <h2 class="text-lg font-semibold flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                                3. 后期处理工作坊
+                            </h2>
+                            <p class="text-xs text-gray-500 mt-1">手动修掉杂色小块；所有修改会直接用于导出和用量表。</p>
+                        </div>
+                        <span id="workshopStatus" class="hidden text-xs font-medium text-violet-700 bg-violet-50 px-2 py-1 rounded-full whitespace-nowrap">未选择格子</span>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mb-3" role="group" aria-label="编辑工具">
+                        <button id="selectToolBtn" class="workshop-tool active" title="选择格子（S）">选择</button>
+                        <button id="brushToolBtn" class="workshop-tool" title="用当前颜色修改格子（B）">改色</button>
+                        <button id="eyedropperToolBtn" class="workshop-tool" title="从图中吸取颜色（I）">吸管</button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                        <button id="copyColorBtn" class="workshop-action" title="复制已选格子的颜色到画笔（Ctrl/Cmd + C）">复制所选颜色</button>
+                        <button id="pasteColorBtn" class="workshop-action" title="把复制的颜色粘贴到已选格子（Ctrl/Cmd + V）">粘贴到所选格</button>
+                        <button id="replaceColorBtn" class="workshop-action col-span-2" title="把与所选格同色的全部豆粒换成当前颜色">替换全部同色</button>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-3 text-xs text-gray-500 border-t pt-3 mb-3">
+                        <span>快捷键：S 选择 · B 改色 · I 吸管 · Ctrl/Cmd+C/V 复制粘贴 · Ctrl/Cmd+Z 撤销</span>
+                        <button id="undoEditBtn" class="text-violet-700 hover:text-violet-900 font-medium whitespace-nowrap">撤销修改</button>
+                    </div>
+
+                    <label class="block text-sm font-medium text-gray-700 mb-2" for="paletteSearchInput">完整色库</label>
+                    <input id="paletteSearchInput" type="search" placeholder="搜索色号或名称，例如 A01" class="w-full border border-gray-300 rounded-md p-2 text-sm focus:border-violet-500 focus:ring focus:ring-violet-200 mb-2">
+                    <div class="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                        <span id="activeColorSwatch" class="h-4 w-4 rounded border border-gray-300 bg-white"></span>
+                        <span id="activeColorLabel">点击色块选择要替换的颜色</span>
+                    </div>
+                    <div id="workshopPalette" class="workshop-palette" aria-label="完整颜色库"></div>
+                </div>
+
                 <!-- Action -->
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 disabled-section" id="downloadSection">
                     <h2 class="text-lg font-semibold mb-4 flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        3. 导出图纸
+                        4. 导出图纸
                     </h2>
                     <div class="space-y-3">
                         <button id="downloadPdfBtn" class="w-full flex items-center justify-center space-x-2 border border-transparent bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition">
@@ -247,7 +286,7 @@
 
                 <!-- Preview Canvas -->
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[500px] flex flex-col">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex justify-between items-center mb-4 gap-3 flex-wrap">
                         <h2 class="text-lg font-semibold">实时预览</h2>
                         <div class="flex items-center space-x-3">
                              <label class="inline-flex items-center">
@@ -273,15 +312,22 @@
                                  尺寸: <span id="previewDims">- x -</span>
                              </div>
                         </div>
+                        <div class="flex items-center gap-2 text-sm text-gray-600" aria-label="预览缩放">
+                            <span>缩放</span>
+                            <button id="zoomOutBtn" class="zoom-button" title="缩小预览">−</button>
+                            <input id="zoomRange" type="range" min="50" max="500" step="10" value="100" class="w-24 accent-violet-600" aria-label="预览缩放比例">
+                            <button id="zoomInBtn" class="zoom-button" title="放大预览">+</button>
+                            <span id="zoomValue" class="w-10 text-right font-medium">100%</span>
+                        </div>
                     </div>
                     
-                    <div class="flex-grow flex items-center justify-center bg-gray-100 rounded-lg overflow-auto p-4 relative" id="canvasContainer">
+                    <div class="flex-grow flex items-start justify-start bg-gray-100 rounded-lg overflow-auto p-4 relative" id="canvasContainer">
                         <p id="emptyState" class="text-gray-400 text-center">
                             请先在左侧上传图片<br>
                             生成的像素图将在此显示
                         </p>
                         <!-- Main display canvas -->
-                        <canvas id="pixelCanvas" class="hidden shadow-lg max-w-full"></canvas>
+                        <canvas id="pixelCanvas" class="hidden shadow-lg flex-none"></canvas>
                     </div>
                 </div>
 

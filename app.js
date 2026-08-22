@@ -6,6 +6,12 @@ let state = {
     transparencyMask: new Set(), // Set of "x,y" strings
     wandHistory: [], // Array of Sets for undo
     isWandActive: false,
+    selectedCell: null,
+    paintColor: null,
+    copiedColor: null,
+    editHistory: [],
+    activeWorkshopTool: 'select',
+    workshopZoom: 100,
     lastWidth: 0,
     lastHeight: 0,
     settings: {
@@ -35,6 +41,7 @@ const elements = {
     fileInput: document.getElementById('fileInput'),
     controlsSection: document.getElementById('controlsSection'),
     downloadSection: document.getElementById('downloadSection'),
+    workshopSection: document.getElementById('workshopSection'),
     emptyState: document.getElementById('emptyState'),
     
     // Inputs
@@ -94,7 +101,25 @@ const elements = {
     sliceContainer: document.getElementById('sliceContainer'),
     sliceSizeInput: document.getElementById('sliceSizeInput'),
     regenerateSlicesBtn: document.getElementById('regenerateSlicesBtn'),
-    closeSliceBtn: document.getElementById('closeSliceBtn')
+    closeSliceBtn: document.getElementById('closeSliceBtn'),
+
+    // Post-processing workshop
+    selectToolBtn: document.getElementById('selectToolBtn'),
+    brushToolBtn: document.getElementById('brushToolBtn'),
+    eyedropperToolBtn: document.getElementById('eyedropperToolBtn'),
+    copyColorBtn: document.getElementById('copyColorBtn'),
+    pasteColorBtn: document.getElementById('pasteColorBtn'),
+    replaceColorBtn: document.getElementById('replaceColorBtn'),
+    undoEditBtn: document.getElementById('undoEditBtn'),
+    paletteSearchInput: document.getElementById('paletteSearchInput'),
+    workshopPalette: document.getElementById('workshopPalette'),
+    workshopStatus: document.getElementById('workshopStatus'),
+    activeColorSwatch: document.getElementById('activeColorSwatch'),
+    activeColorLabel: document.getElementById('activeColorLabel'),
+    zoomRange: document.getElementById('zoomRange'),
+    zoomInBtn: document.getElementById('zoomInBtn'),
+    zoomOutBtn: document.getElementById('zoomOutBtn'),
+    zoomValue: document.getElementById('zoomValue')
 };
 
 // --- Initialization ---
@@ -108,6 +133,7 @@ function init() {
         // Actually, let's inject options based on JS object to be safe.
         renderPaletteOptions();
     }
+    updateWorkshopUI();
 }
 
 function renderPaletteOptions() {
@@ -216,8 +242,24 @@ function setupEventListeners() {
             });
             // Add highlight to selected
             row.classList.add('bg-yellow-50', 'ring-1', 'ring-yellow-300');
+            const color = getActivePalette().find(item => item.id === row.dataset.colorId);
+            if (color) selectWorkshopColor(color);
         }
     });
+
+    // Post-processing workshop
+    elements.selectToolBtn.addEventListener('click', () => setWorkshopTool('select'));
+    elements.brushToolBtn.addEventListener('click', () => setWorkshopTool('brush'));
+    elements.eyedropperToolBtn.addEventListener('click', () => setWorkshopTool('eyedropper'));
+    elements.copyColorBtn.addEventListener('click', copySelectedColor);
+    elements.pasteColorBtn.addEventListener('click', pasteCopiedColor);
+    elements.replaceColorBtn.addEventListener('click', replaceAllSelectedColor);
+    elements.undoEditBtn.addEventListener('click', undoEdit);
+    elements.paletteSearchInput.addEventListener('input', renderWorkshopPalette);
+    elements.zoomRange.addEventListener('input', (e) => setWorkshopZoom(parseInt(e.target.value)));
+    elements.zoomInBtn.addEventListener('click', () => setWorkshopZoom(state.workshopZoom + 10));
+    elements.zoomOutBtn.addEventListener('click', () => setWorkshopZoom(state.workshopZoom - 10));
+    document.addEventListener('keydown', handleWorkshopShortcut);
 
     elements.processBtn.addEventListener('click', processImage);
     elements.showGridCheck.addEventListener('change', (e) => {
@@ -320,6 +362,8 @@ function enableControls() {
     elements.controlsSection.classList.add('active');
     elements.downloadSection.classList.remove('disabled-section');
     elements.downloadSection.classList.add('active');
+    elements.workshopSection.classList.remove('disabled-section');
+    elements.workshopSection.classList.add('active');
     elements.emptyState.classList.add('hidden');
     elements.pixelCanvas.classList.remove('hidden');
     elements.bomSection.classList.remove('hidden');
@@ -501,8 +545,15 @@ function processImage() {
     }
 
     state.processedGrid = newGrid;
+    // A newly generated grid replaces every manually edited cell.
+    state.selectedCell = null;
+    state.paintColor = null;
+    state.copiedColor = null;
+    state.editHistory = [];
     elements.previewDims.textContent = `${width} x ${height}`;
     
+    renderWorkshopPalette();
+    updateWorkshopUI();
     renderPreview();
     updateBOM();
 }
@@ -597,6 +648,206 @@ function deltaE(lab1, lab2) {
     return Math.sqrt(dl * dl + da * da + db * db);
 }
 
+// --- Post-processing workshop ---
+function getActivePalette() {
+    return PALETTES[state.settings.palette] || PALETTES.mard;
+}
+
+function renderWorkshopPalette() {
+    if (!elements.workshopPalette) return;
+    const query = (elements.paletteSearchInput.value || '').trim().toLowerCase();
+    const colors = getActivePalette().filter(color => {
+        return !query || `${color.id} ${color.name} ${color.hex}`.toLowerCase().includes(query);
+    });
+
+    elements.workshopPalette.innerHTML = colors.map(color => `
+        <button class="palette-swatch${state.paintColor && state.paintColor.id === color.id && state.paintColor.hex === color.hex ? ' active' : ''}"
+            type="button" data-color-id="${color.id}" data-color-hex="${color.hex}"
+            style="background-color: ${color.hex}" title="${color.id} · ${color.name} · ${color.hex}" aria-label="选择 ${color.id} ${color.name}"></button>
+    `).join('') || '<p class="col-span-full text-xs text-gray-400 py-3 text-center">没有找到相符的颜色</p>';
+
+    elements.workshopPalette.querySelectorAll('.palette-swatch').forEach(button => {
+        button.addEventListener('click', () => {
+            const color = getActivePalette().find(item => item.id === button.dataset.colorId && item.hex === button.dataset.colorHex);
+            if (color) selectWorkshopColor(color);
+        });
+    });
+}
+
+function selectWorkshopColor(color) {
+    state.paintColor = color;
+    setWorkshopTool('brush');
+    renderWorkshopPalette();
+    updateWorkshopUI();
+}
+
+function setWorkshopTool(tool) {
+    state.activeWorkshopTool = tool;
+    if (elements.pixelCanvas && state.processedGrid.length) {
+        elements.pixelCanvas.style.cursor = tool === 'brush' ? 'crosshair' : tool === 'eyedropper' ? 'copy' : 'default';
+    }
+    updateWorkshopUI();
+}
+
+function updateWorkshopUI() {
+    if (!elements.selectToolBtn) return;
+    const selected = state.selectedCell;
+    const selectedColor = selected && state.processedGrid[selected.y] ? state.processedGrid[selected.y][selected.x] : null;
+    const hasGrid = state.processedGrid.length > 0;
+
+    [
+        [elements.selectToolBtn, 'select'],
+        [elements.brushToolBtn, 'brush'],
+        [elements.eyedropperToolBtn, 'eyedropper']
+    ].forEach(([button, tool]) => button.classList.toggle('active', state.activeWorkshopTool === tool));
+
+    elements.copyColorBtn.disabled = !selectedColor;
+    elements.pasteColorBtn.disabled = !selected || !state.copiedColor;
+    elements.replaceColorBtn.disabled = !selectedColor || !state.paintColor || sameColor(selectedColor, state.paintColor);
+    elements.undoEditBtn.disabled = state.editHistory.length === 0;
+
+    if (state.paintColor) {
+        elements.activeColorSwatch.style.backgroundColor = state.paintColor.hex;
+        elements.activeColorLabel.textContent = `当前改色：${state.paintColor.id} · ${state.paintColor.name}`;
+    } else {
+        elements.activeColorSwatch.style.backgroundColor = '#ffffff';
+        elements.activeColorLabel.textContent = '点击色块选择要替换的颜色';
+    }
+
+    if (selected) {
+        const label = selectedColor ? `${selected.x + 1}, ${selected.y + 1} · ${selectedColor.id}` : `${selected.x + 1}, ${selected.y + 1} · 透明格`;
+        elements.workshopStatus.textContent = `已选：${label}`;
+        elements.workshopStatus.classList.remove('hidden');
+    } else {
+        elements.workshopStatus.classList.add('hidden');
+    }
+    if (!hasGrid) elements.workshopStatus.classList.add('hidden');
+}
+
+function sameColor(a, b) {
+    return !!a && !!b && a.id === b.id && a.hex === b.hex;
+}
+
+function saveEdit(changes) {
+    if (!changes.length) return;
+    state.editHistory.push(changes);
+    if (state.editHistory.length > 100) state.editHistory.shift();
+}
+
+function selectCell(x, y) {
+    state.selectedCell = { x, y };
+    updateWorkshopUI();
+    renderPreview();
+}
+
+function paintCell(x, y, color = state.paintColor) {
+    if (!color) return;
+    const previousColor = state.processedGrid[y][x];
+    const key = `${x},${y}`;
+    const wasMasked = state.transparencyMask.has(key);
+    if (sameColor(previousColor, color) && !wasMasked) {
+        selectCell(x, y);
+        return;
+    }
+    saveEdit([{ x, y, previousColor, wasMasked }]);
+    state.processedGrid[y][x] = color;
+    state.transparencyMask.delete(key);
+    state.selectedCell = { x, y };
+    renderPreview();
+    updateBOM();
+    updateWorkshopUI();
+}
+
+function copySelectedColor() {
+    if (!state.selectedCell) return;
+    const { x, y } = state.selectedCell;
+    const color = state.processedGrid[y][x];
+    if (!color || state.transparencyMask.has(`${x},${y}`)) return;
+    state.copiedColor = color;
+    state.paintColor = color;
+    setWorkshopTool('brush');
+    renderWorkshopPalette();
+    updateWorkshopUI();
+}
+
+function pasteCopiedColor() {
+    if (!state.selectedCell || !state.copiedColor) return;
+    paintCell(state.selectedCell.x, state.selectedCell.y, state.copiedColor);
+}
+
+function replaceAllSelectedColor() {
+    if (!state.selectedCell || !state.paintColor) return;
+    const { x: sourceX, y: sourceY } = state.selectedCell;
+    const sourceColor = state.processedGrid[sourceY][sourceX];
+    if (!sourceColor || sameColor(sourceColor, state.paintColor)) return;
+
+    const changes = [];
+    state.processedGrid.forEach((row, y) => row.forEach((color, x) => {
+        const key = `${x},${y}`;
+        if (color && !state.transparencyMask.has(key) && sameColor(color, sourceColor)) {
+            changes.push({ x, y, previousColor: color, wasMasked: false });
+            state.processedGrid[y][x] = state.paintColor;
+        }
+    }));
+    saveEdit(changes);
+    renderPreview();
+    updateBOM();
+    updateWorkshopUI();
+}
+
+function undoEdit() {
+    const changes = state.editHistory.pop();
+    if (!changes) return;
+    changes.forEach(({ x, y, previousColor, wasMasked }) => {
+        state.processedGrid[y][x] = previousColor;
+        const key = `${x},${y}`;
+        if (wasMasked) state.transparencyMask.add(key);
+        else state.transparencyMask.delete(key);
+    });
+    renderPreview();
+    updateBOM();
+    updateWorkshopUI();
+}
+
+function setWorkshopZoom(value) {
+    state.workshopZoom = Math.max(50, Math.min(500, value));
+    elements.zoomRange.value = state.workshopZoom;
+    elements.zoomValue.textContent = `${state.workshopZoom}%`;
+    renderPreview();
+}
+
+function handleWorkshopShortcut(event) {
+    const target = event.target;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+    if (!state.processedGrid.length) return;
+    const key = event.key.toLowerCase();
+    if ((event.ctrlKey || event.metaKey) && key === 'c') {
+        event.preventDefault();
+        copySelectedColor();
+    } else if ((event.ctrlKey || event.metaKey) && key === 'v') {
+        event.preventDefault();
+        pasteCopiedColor();
+    } else if ((event.ctrlKey || event.metaKey) && key === 'z') {
+        event.preventDefault();
+        undoEdit();
+    } else if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (key === 's') setWorkshopTool('select');
+        if (key === 'b') setWorkshopTool('brush');
+        if (key === 'i') setWorkshopTool('eyedropper');
+    }
+}
+
+function getPreviewLayout() {
+    const grid = state.processedGrid;
+    const width = grid[0].length;
+    const containerWidth = Math.max(1, elements.canvasContainer.clientWidth - 40);
+    const coordOffset = state.settings.showCoords ? 20 : 0;
+    let pixelSize = Math.floor((containerWidth - coordOffset) / width);
+    pixelSize = Math.max(8, Math.min(30, pixelSize));
+    pixelSize = Math.max(2, Math.round(pixelSize * state.workshopZoom / 100));
+    return { pixelSize, coordOffset };
+}
+
 // --- Rendering ---
 function renderPreview() {
     if (state.processedGrid.length === 0) return;
@@ -605,20 +856,7 @@ function renderPreview() {
     const height = grid.length;
     const width = grid[0].length;
     
-    // Scale for display
-    const containerWidth = elements.canvasContainer.clientWidth - 40;
-    const maxPixelSize = 30;
-    const minPixelSize = 8; 
-    
-    let pixelSize = Math.floor(containerWidth / width);
-    const coordOffset = state.settings.showCoords ? 20 : 0;
-    
-    if (state.settings.showCoords) {
-        pixelSize = Math.floor((containerWidth - coordOffset) / width);
-    }
-    
-    if (pixelSize > maxPixelSize) pixelSize = maxPixelSize;
-    if (pixelSize < minPixelSize) pixelSize = minPixelSize;
+    const { pixelSize, coordOffset } = getPreviewLayout();
 
     const canvas = elements.pixelCanvas;
     const totalWidth = (width * pixelSize) + coordOffset;
@@ -627,6 +865,7 @@ function renderPreview() {
     canvas.width = totalWidth;
     canvas.height = totalHeight;
     canvas.style.display = 'block';
+    canvas.style.maxWidth = 'none';
 
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -724,6 +963,15 @@ function renderPreview() {
              ctx.lineTo(startX + width * pixelSize, py);
              ctx.stroke();
         }
+    }
+
+    if (state.selectedCell) {
+        const { x, y } = state.selectedCell;
+        ctx.save();
+        ctx.strokeStyle = '#7c3aed';
+        ctx.lineWidth = Math.max(2, Math.ceil(pixelSize / 7));
+        ctx.strokeRect(startX + x * pixelSize + ctx.lineWidth / 2, startY + y * pixelSize + ctx.lineWidth / 2, pixelSize - ctx.lineWidth, pixelSize - ctx.lineWidth);
+        ctx.restore();
     }
 }
 
@@ -1091,62 +1339,46 @@ function updateWandUI() {
         elements.toggleWandBtn.classList.add('bg-white', 'text-blue-600');
         elements.toggleWandBtn.classList.remove('bg-blue-600', 'text-white');
         elements.wandControls.classList.add('hidden');
-        elements.pixelCanvas.style.cursor = 'default';
+        setWorkshopTool(state.activeWorkshopTool);
     }
 }
 
 function handleCanvasClick(e) {
-    if (!state.isWandActive || state.processedGrid.length === 0) return;
-    
+    if (state.processedGrid.length === 0) return;
     const rect = elements.pixelCanvas.getBoundingClientRect();
     const scaleX = elements.pixelCanvas.width / rect.width;
     const scaleY = elements.pixelCanvas.height / rect.height;
-    
     const clickX = (e.clientX - rect.left) * scaleX;
     const clickY = (e.clientY - rect.top) * scaleY;
-    
     const grid = state.processedGrid;
     const height = grid.length;
     const width = grid[0].length;
-    
-    // Calculate pixel size (should match renderPreview logic)
-    const containerWidth = elements.canvasContainer.clientWidth - 40;
-    const maxPixelSize = 30;
-    const minPixelSize = 8; 
-    const coordOffset = state.settings.showCoords ? 20 : 0;
-    
-    let pixelSize = Math.floor((state.settings.showCoords ? (containerWidth - coordOffset) : containerWidth) / width);
-    if (state.settings.showCoords) {
-        pixelSize = Math.floor((containerWidth - coordOffset) / width);
-    }
-    
-    if (pixelSize > maxPixelSize) pixelSize = maxPixelSize;
-    if (pixelSize < minPixelSize) pixelSize = minPixelSize;
-    
+    const { pixelSize, coordOffset } = getPreviewLayout();
     const startX = coordOffset;
     const startY = coordOffset;
-    
     const gridX = Math.floor((clickX - startX) / pixelSize);
     const gridY = Math.floor((clickY - startY) / pixelSize);
-    
     if (gridX < 0 || gridX >= width || gridY < 0 || gridY >= height) return;
-    
-    // Pencil Mode Removed
-    
-    // Wand Mode logic...
-    // Perform Flood Fill Remove
-    // Use RAW color for click target too if available
-    const targetColor = state.rawGrid ? state.rawGrid[gridY][gridX] : grid[gridY][gridX];
-    
-    if (!targetColor) return; // Already transparent
-    
-    // Save state for undo
-    state.wandHistory.push(new Set(state.transparencyMask));
-    
-    floodFillRemove(gridX, gridY, targetColor, width, height, !!state.rawGrid);
-    
-    renderPreview();
-    updateBOM();
+
+    if (state.isWandActive) {
+        const targetColor = state.rawGrid ? state.rawGrid[gridY][gridX] : grid[gridY][gridX];
+        if (!targetColor) return;
+        state.wandHistory.push(new Set(state.transparencyMask));
+        floodFillRemove(gridX, gridY, targetColor, width, height, !!state.rawGrid);
+        renderPreview();
+        updateBOM();
+        updateWorkshopUI();
+        return;
+    }
+
+    if (state.activeWorkshopTool === 'brush') {
+        paintCell(gridX, gridY);
+    } else if (state.activeWorkshopTool === 'eyedropper') {
+        state.selectedCell = { x: gridX, y: gridY };
+        copySelectedColor();
+    } else {
+        selectCell(gridX, gridY);
+    }
 }
 
 function floodFillRemove(startX, startY, targetColor, width, height, useRaw = false) {
