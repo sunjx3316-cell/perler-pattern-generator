@@ -13,6 +13,7 @@ def read_file(path):
 def main():
     print("Reading files...")
     html = read_file('index.html')
+    tailwind = read_file('tailwind.css')
     css = read_file('style.css')
     colors = read_file('colors.js')
     app = read_file('app.js')
@@ -41,7 +42,14 @@ def main():
             'https://cdn.bootcdn.net/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
         )
 
-    # Embed CSS
+    # Embed local framework CSS and project CSS so the portable page never needs
+    # the Tailwind runtime CDN to render correctly.
+    if '<link rel="stylesheet" href="tailwind.css">' in html:
+        html = html.replace('<link rel="stylesheet" href="tailwind.css">', f'<style>\n{tailwind}\n</style>')
+    else:
+        print("Warning: tailwind.css link not found in index.html")
+
+    # Embed project CSS
     if '<link rel="stylesheet" href="style.css">' in html:
         html = html.replace('<link rel="stylesheet" href="style.css">', f'<style>\n{css}\n</style>')
     else:
