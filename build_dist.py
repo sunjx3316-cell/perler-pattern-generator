@@ -1,4 +1,5 @@
 import os
+import re
 
 def read_file(path):
     encodings = ['utf-8', 'utf-16', 'gbk', 'utf-8-sig']
@@ -56,20 +57,20 @@ def main():
         print("Warning: style.css link not found in index.html")
 
     # Embed Colors JS
-    if '<script src="colors.js"></script>' in html:
-        html = html.replace('<script src="colors.js"></script>', f'<script>\n{colors}\n</script>')
+    if re.search(r'<script src="colors\.js(?:\?[^"]*)?"></script>', html):
+        html = re.sub(r'<script src="colors\.js(?:\?[^"]*)?"></script>', lambda _: f'<script>\n{colors}\n</script>', html)
     else:
         print("Warning: colors.js script tag not found in index.html")
 
     # Embed App JS
-    if '<script src="app.js"></script>' in html:
-        html = html.replace('<script src="app.js"></script>', f'<script>\n{app}\n</script>')
+    if re.search(r'<script src="app\.js(?:\?[^"]*)?"></script>', html):
+        html = re.sub(r'<script src="app\.js(?:\?[^"]*)?"></script>', lambda _: f'<script>\n{app}\n</script>', html)
     else:
         print("Warning: app.js script tag not found in index.html")
 
     print("Writing dist.html...")
-    with open('dist.html', 'w', encoding='utf-8') as f:
-        f.write(html)
+    with open('dist.html', 'w', encoding='utf-8', newline='\n') as f:
+        f.write('\n'.join(line.rstrip() for line in html.splitlines()) + '\n')
     
     print("Build complete: dist.html")
 

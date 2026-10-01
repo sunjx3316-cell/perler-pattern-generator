@@ -125,25 +125,17 @@ const elements = {
 // --- Initialization ---
 function init() {
     setupEventListeners();
-    // Populate palette select if needed, but it's hardcoded in HTML for now. 
-    // Let's ensure 'mard' is selected by default if not present
-    if (elements.paletteSelect.value !== 'mard') {
-        // If mard exists in options, select it. If not, we might need to add it dynamically?
-        // Assuming HTML has generic options or we just override logic.
-        // Actually, let's inject options based on JS object to be safe.
-        renderPaletteOptions();
-    }
+    renderPaletteOptions();
+    renderPaletteInfo();
+    renderWorkshopPalette();
     updateWorkshopUI();
 }
 
 function renderPaletteOptions() {
     elements.paletteSelect.innerHTML = '';
-    const options = [
-        { value: 'mard', label: '通用拼豆 (A-H 色号系统)' },
-        { value: 'perler', label: 'Perler (P系列)' },
-        { value: 'artkal', label: 'Artkal (S系列)' },
-        { value: 'hama', label: 'Hama (H系列)' }
-    ];
+    const options = Object.entries(PALETTE_INFO).map(([value, info]) => ({
+        value, label: `${info.label} · ${PALETTES[value].length} 色`
+    }));
     
     options.forEach(opt => {
         const el = document.createElement('option');
@@ -151,7 +143,14 @@ function renderPaletteOptions() {
         el.textContent = opt.label;
         elements.paletteSelect.appendChild(el);
     });
-    elements.paletteSelect.value = 'mard';
+    elements.paletteSelect.value = state.settings.palette;
+}
+
+function renderPaletteInfo() {
+    const info = PALETTE_INFO[state.settings.palette];
+    const note = document.getElementById('paletteSourceNote');
+    note.textContent = `${info.quality}。${info.note} 特殊材质参考色只供手动选择。`;
+    document.getElementById('paletteSourceLink').href = info.source;
 }
 
 // --- Event Listeners ---
@@ -306,7 +305,18 @@ function setupEventListeners() {
 }
 
 function updateSetting(key, value) {
+    if (key === 'palette' && (!PALETTES[value] || !PALETTES[value].length)) return;
     state.settings[key] = value;
+    if (key === 'palette') {
+        state.paintColor = null;
+        state.copiedColor = null;
+        state.selectedCell = null;
+        state.editHistory = [];
+        elements.paletteSearchInput.value = '';
+        renderPaletteInfo();
+        renderWorkshopPalette();
+        updateWorkshopUI();
+    }
     
     // Update UI labels
     if (key === 'width') elements.widthVal.textContent = value;
@@ -484,7 +494,7 @@ function processImage() {
     data = imageData.data; // Update reference just in case
 
     // Color Quantization & Dithering
-    let currentPalette = PALETTES[palette] || PALETTES['mard'];
+    const currentPalette = PALETTES[palette].filter(color => color.matchEligible !== false);
     
     // Pre-calculate LAB
     if (matchMode === 'lab' && !currentPalette[0].lab) {
@@ -655,15 +665,16 @@ function getActivePalette() {
 
 function renderWorkshopPalette() {
     if (!elements.workshopPalette) return;
-    const query = (elements.paletteSearchInput.value || '').trim().toLowerCase();
+    const normalizeCode = value => value.toLowerCase().replace(/([a-z])0+(\d)/g, '$1$2');
+    const query = normalizeCode((elements.paletteSearchInput.value || '').trim());
     const colors = getActivePalette().filter(color => {
-        return !query || `${color.id} ${color.name} ${color.hex}`.toLowerCase().includes(query);
+        return !query || normalizeCode(`${color.id} ${color.name} ${color.hex}`).includes(query);
     });
 
     elements.workshopPalette.innerHTML = colors.map(color => `
         <button class="palette-swatch${state.paintColor && state.paintColor.id === color.id && state.paintColor.hex === color.hex ? ' active' : ''}"
             type="button" data-color-id="${color.id}" data-color-hex="${color.hex}"
-            style="background-color: ${color.hex}" title="${color.id} · ${color.name} · ${color.hex}" aria-label="选择 ${color.id} ${color.name}"></button>
+            style="background-color: ${color.hex}" title="${color.id} · ${color.name} · ${color.hex} · RGB(${color.r}, ${color.g}, ${color.b})" aria-label="选择 ${color.id} ${color.name}"></button>
     `).join('') || '<p class="col-span-full text-xs text-gray-400 py-3 text-center">没有找到相符的颜色</p>';
 
     elements.workshopPalette.querySelectorAll('.palette-swatch').forEach(button => {
@@ -935,7 +946,7 @@ function renderPreview() {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 // Show short ID (A1, H23)
-                ctx.fillText(color.id, startX + x * pixelSize + pixelSize/2, startY + y * pixelSize + pixelSize/2);
+                ctx.fillText(color.id, startX + x * pixelSize + pixelSize/2, startY + y * pixelSize + pixelSize/2, pixelSize - 2);
             }
         }
     }
@@ -1149,7 +1160,7 @@ function downloadImage() {
             ctx.font = 'bold 11px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(color.id, px + pixelSize/2, py + pixelSize/2);
+            ctx.fillText(color.id, px + pixelSize/2, py + pixelSize/2, pixelSize - 2);
         }
     }
     
@@ -1277,6 +1288,10 @@ async function downloadPDF() {
             if (fontSize < 3) fontSize = 3;
             
             doc.setFontSize(fontSize);
+            const labelWidth = doc.getTextWidth(color.id);
+            if (labelWidth > cellSize * 0.85) {
+                doc.setFontSize(fontSize * cellSize * 0.85 / labelWidth);
+            }
             doc.text(color.id, px + cellSize/2, py + cellSize/2 + (fontSize/3), null, null, "center");
         }
     }

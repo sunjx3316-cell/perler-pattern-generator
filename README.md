@@ -20,7 +20,8 @@
 
 - 支持 JPG、PNG、GIF 图片。
 - 可设置目标宽度，兼顾小尺寸快速作品与大尺寸细节作品。
-- 可选通用 A–H、Perler、Hama Midi、Artkal S 色库。
+- 可选 MARD 221 色、Perler 103 色、Hama Midi 92 色、Artkal S 173 色、Artkal C 172 色；按品牌和尺寸选择。
+- Artkal 使用官方 RGB 表；其他品牌使用注明来源的社区参考 RGB。覆盖范围、未收录色号及精度说明见 [色库来源](COLOR_SOURCES.md)。
 - RGB / CIELAB 两种颜色匹配方式，支持抖动、主色/平均采样。
 - 支持亮度、对比度、饱和度、网格偏移等调整。
 - 支持魔棒和自动角落背景移除。

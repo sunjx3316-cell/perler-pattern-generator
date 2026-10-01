@@ -74,11 +74,10 @@
                     <div class="mb-5">
                         <label class="block text-sm font-medium text-gray-700 mb-2">颜色品牌库</label>
                         <select id="paletteSelect" class="w-full border-gray-300 rounded-md shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 p-2 border">
-                            <option value="custom">通用拼豆 (A-H 色号系统)</option>
-                            <option value="perler">Perler (标准)</option>
-                            <option value="hama">Hama Midi</option>
-                            <option value="artkal">Artkal S</option>
+                            <option value="mard">MARD 马尔德</option>
                         </select>
+                        <p id="paletteSourceNote" class="text-xs text-gray-500 mt-2" aria-live="polite"></p>
+                        <a id="paletteSourceLink" class="text-xs text-primary" target="_blank" rel="noopener noreferrer">查看色库数据来源 ↗</a>
                     </div>
 
                     <!-- Image Adjustments -->
@@ -345,7 +344,7 @@
     <!-- Hidden Processing Canvas -->
     <canvas id="processCanvas" class="hidden"></canvas>
 
-    <script src="colors.js"></script>
-    <script src="app.js"></script>
+    <script src="colors.js?v=20261001-palettes"></script>
+    <script src="app.js?v=20261001-palettes"></script>
 </body>
 </html>
